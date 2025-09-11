@@ -1,0 +1,53 @@
+# Root-level ignores
+.env
+*.env
+*.log
+.DS_Store
+
+# Node.js/Svelte (frontend)
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/.env
+frontend/.env.*
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/npm-debug.log
+frontend/yarn-debug.log
+frontend/yarn-error.log
+
+# Python/FastAPI (backend)
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.env
+backend/.env.*
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.coverage
+backend/instance/
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.vscode/
+backend/.ruff_cache/
+
+# Terraform (infra)
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.*
+infra/crash.log
+infra/override.tf
+infra/override.tf.json
+infra/*.tfplan
+infra/.terraformrc
+infra/terraform.rc
+
+# Docker
+**/tmp/
+**/logs/
+docker-compose.override.yml
+
+# VSCode
+.vscode/

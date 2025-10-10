@@ -1,0 +1,63 @@
+graph TB
+    subgraph External["External Services"]
+        Hover["Hover (DNS Registrar)<br/>kenhowardpdx.com"]
+        Auth0["Auth0<br/>Authentication Service"]
+    end
+
+    subgraph AWS["AWS Cloud"]
+        subgraph DNS["DNS & CDN Layer"]
+            R53["Route 53<br/>tally.kenhowardpdx.com"]
+            CF["CloudFront Distribution<br/>(CDN + SSL/TLS)"]
+            ACM["ACM Certificate<br/>(SSL/TLS)"]
+        end
+
+        subgraph Frontend["Frontend Layer"]
+            S3["S3 Bucket<br/>Static Website Hosting<br/>(Svelte App)"]
+        end
+
+        subgraph API["API Layer"]
+            APIGW["API Gateway<br/>(REST API Endpoint)"]
+            Lambda["Lambda Function<br/>(Python + FastAPI)"]
+        end
+
+        subgraph Data["Data Layer"]
+            RDS["RDS PostgreSQL<br/>(Database)"]
+            Secrets["AWS Secrets Manager<br/>(DB Credentials)"]
+        end
+
+        subgraph Network["Network Layer"]
+            VPC["VPC"]
+            SG1["Security Group<br/>(Lambda)"]
+            SG2["Security Group<br/>(RDS)"]
+        end
+    end
+
+    User["User Browser"]
+
+    %% External connections
+    Hover -->|"NS Records"| R53
+    User -->|"1. Access URL"| R53
+    User <-->|"2. OAuth Login"| Auth0
+
+    %% DNS and CDN flow
+    R53 -->|"Route traffic"| CF
+    CF -->|"Serves cached content"| S3
+    ACM -->|"Provides SSL cert"| CF
+
+    %% API flow
+    User -->|"3. API Requests<br/>(w/ Auth0 JWT)"| APIGW
+    APIGW -->|"4. Invoke"| Lambda
+    Lambda -->|"5. Validate JWT<br/>& Process"| Auth0
+    Lambda -->|"6. Query/Write<br/>(filtered by user)"| RDS
+    Lambda -->|"Get credentials"| Secrets
+
+    %% Network relationships
+    Lambda -.->|"Inside"| VPC
+    RDS -.->|"Inside"| VPC
+    SG1 -.->|"Attached to"| Lambda
+    SG2 -.->|"Attached to"| RDS
+    SG1 -->|"Allows outbound to"| SG2
+
+    style AWS fill:#FF9900,stroke:#232F3E,stroke-width:3px,color:#fff
+    style External fill:#E8F5E9,stroke:#4CAF50,stroke-width:2px
+    style User fill:#E3F2FD,stroke:#2196F3,stroke-width:2px

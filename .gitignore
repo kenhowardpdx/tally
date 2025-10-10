@@ -43,6 +43,7 @@ infra/override.tf.json
 infra/*.tfplan
 infra/.terraformrc
 infra/terraform.rc
+infra/.aws-credentials
 
 # Docker
 **/tmp/

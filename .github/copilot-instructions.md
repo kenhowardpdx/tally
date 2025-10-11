@@ -41,14 +41,37 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Include tests for new features
 - Update documentation when adding new functionality
 
+#### Pull Request Creation
+- **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`
+- **For simple PRs**: Use inline `--body` with GitHub CLI
+- **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
+- **Use emojis and formatting**: Make PR descriptions clear and scannable with sections, checkboxes, and context
+
 ## Development Practices
 
 ### Local Development
 
 - Use Docker Compose for local development environment
+- **Use `.secrets` file** for local sensitive configuration (never commit this file)
 - Test GitHub Actions locally using `act` (use Makefile targets like `make github_workflow_terraform-pr`)
 - Validate Terraform changes locally before committing
 - Run tests before pushing changes
+
+#### .secrets File Pattern
+Create a `.secrets` file in the project root for local development:
+```bash
+# .secrets file (never commit - already in .gitignore)
+AWS_PROFILE=AdministratorAccess-123456789012
+AWS_ROLE_ARN=arn:aws:iam::123456789012:role/tally-github-actions-role
+TF_VAR_aws_account_id=123456789012
+TF_VAR_aws_profile=AdministratorAccess-123456789012
+```
+
+Source it in your shell:
+```bash
+source .secrets
+make github_workflow_terraform-pr  # Now has access to AWS credentials
+```
 
 ### Testing
 
@@ -60,11 +83,52 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 ### Security
 
-- Never commit secrets or sensitive data
-- Use environment variables for configuration
+**🔒 CRITICAL: Never commit sensitive information to the repository.**
+
+#### Sensitive Data Protection
+- **Never commit secrets, API keys, tokens, or credentials** to any branch
+- **Never commit real AWS account IDs, ARNs, or resource identifiers**
+- **Never commit personal paths** (e.g., `/Users/username/`) - use generic placeholders
+- **Use `.secrets` file** for local development configuration (already in .gitignore)
+- **Use GitHub repository secrets** for CI/CD credentials
+- **Use placeholder values** in documentation and examples (e.g., `123456789012` for AWS account IDs)
+
+#### Configuration Management
+- **Local Development**: Use `.secrets` file for sensitive configuration
+- **GitHub Actions**: Use repository secrets (`${{ secrets.SECRET_NAME }}`)
+- **Terraform**: Use variables and data sources, never hardcode sensitive values
+- **Documentation**: Always use placeholder values, never real credentials
+
+#### Code Examples - DO NOT DO:
+```hcl
+# ❌ NEVER DO THIS
+bucket = "terraform-state-993450011441"  # Real account ID
+profile = "AdministratorAccess-993450011441"  # Real account ID
+```
+
+#### Code Examples - CORRECT:
+```hcl
+# ✅ CORRECT - Use variables
+bucket = "terraform-state-${var.aws_account_id}"
+profile = var.aws_profile
+
+# ✅ CORRECT - Placeholder in docs
+bucket = "terraform-state-123456789012"  # Your AWS account ID
+```
+
+#### Emergency Response
+If sensitive data is accidentally committed:
+1. **DO NOT** push the commit
+2. Use `git filter-repo` to clean history if already pushed
+3. Contact GitHub Support if data is in PR history
+4. Rotate any exposed credentials immediately
+
+#### Additional Security Practices
 - Follow AWS security best practices
 - Use least privilege principle for IAM roles
 - Validate all user inputs
+- Enable comprehensive logging for security events
+- Use environment variables for all configuration
 
 ## Project Structure
 

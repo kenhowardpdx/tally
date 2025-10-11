@@ -55,3 +55,9 @@ docker-compose.override.yml
 # VSCode
 .vscode/
 .secrets
+
+# Sensitive documentation (never commit)
+github-support-request.md
+
+# Temporary PR files
+pr-body.md

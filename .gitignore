@@ -58,3 +58,6 @@ docker-compose.override.yml
 
 # Sensitive documentation (never commit)
 github-support-request.md
+
+# Temporary PR files
+pr-body.md

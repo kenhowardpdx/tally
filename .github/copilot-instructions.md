@@ -41,6 +41,12 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Include tests for new features
 - Update documentation when adding new functionality
 
+#### Pull Request Creation
+- **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`
+- **For simple PRs**: Use inline `--body` with GitHub CLI
+- **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
+- **Use emojis and formatting**: Make PR descriptions clear and scannable with sections, checkboxes, and context
+
 ## Development Practices
 
 ### Local Development

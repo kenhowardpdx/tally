@@ -91,11 +91,71 @@ For detailed infrastructure setup, deployment guides, and architecture documenta
 └── scripts/         # Deployment and utility scripts
 ```
 
+## Local GitHub Actions Testing
+
+Tally includes support for testing GitHub Actions workflows locally using [Act](https://github.com/nektos/act). This allows you to validate workflows before pushing changes.
+
+### Quick Setup
+
+1. **Install Act**:
+
+   ```sh
+   # macOS
+   brew install act
+
+   # Or download from: https://github.com/nektos/act/releases
+   ```
+
+2. **Configure Secrets**:
+
+   ```sh
+   # Copy the example secrets file
+   cp .secrets.example .secrets
+
+   # Edit .secrets with your actual values
+   # AWS_PROFILE: Your AWS profile name from ~/.aws/config
+   # AWS_ROLE_ARN: Your GitHub Actions role ARN
+   # TF_VAR_aws_account_id: Your AWS account ID (for Terraform)
+   # TF_VAR_aws_profile: Your AWS profile (for local Terraform)
+   ```
+
+3. **Test Workflows**:
+
+   ```sh
+   # The Makefile will automatically use AWS_PROFILE from .secrets
+   # List available workflow targets
+   make help
+
+   # Test Terraform PR validation
+   make github_workflow_terraform-pr
+
+   # Test CI workflow
+   make github_workflow_ci
+   ```
+
+### Secrets Configuration
+
+The `.secrets` file contains **required** configuration for local development:
+
+- **AWS_PROFILE**: Your AWS SSO profile name (e.g., `AdministratorAccess-123456789012`) - **Required**
+- **AWS_ROLE_ARN**: The IAM role ARN that GitHub Actions uses (e.g., `arn:aws:iam::123456789012:role/tally-github-actions-role`)
+- **TF_VAR_aws_account_id**: Your AWS account ID for Terraform backend configuration - **Required**
+- **TF_VAR_aws_profile**: Your AWS profile for local Terraform operations - **Required**
+
+**GitHub Actions**: Uses repository secrets (`AWS_ACCOUNT_ID`, `AWS_ROLE_ARN`) instead of the `.secrets` file.
+
+**Important**: 
+- The `.secrets` file is included in `.gitignore` and should never be committed to version control
+- Required variables must be set - commands will fail with clear error messages if missing
+
 ## Development Workflow
 
 1. **Local Development**: Use Docker Compose for rapid development and testing
 2. **Infrastructure**: Use Terraform with the provided Makefile for AWS deployment
 3. **CI/CD**: GitHub Actions workflows for automated testing and deployment
+4. **Local Testing**: Use Act with our Makefile targets to test workflows locally
+
+For detailed development practices, local testing with GitHub Actions, and debugging guides, see the [Development Guide](docs/DEVELOPING.md).
 
 ## Support
 

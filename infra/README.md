@@ -52,8 +52,9 @@ graph TB
 
 ### AWS Account Setup
 
-1. **AWS SSO Access**: You need access to AWS account `123456789012` with the `AdministratorAccess` role
-2. **S3 State Bucket**: The Terraform state is stored in `terraform-state-123456789012`
+1. **AWS SSO Access**: You need access to your AWS account with the `AdministratorAccess` role
+2. **S3 State Bucket**: Create an S3 bucket for Terraform state storage: `terraform-state-YOUR_ACCOUNT_ID`
+3. **Configuration**: Copy and configure the example files with your account details
 
 ## Quick Start
 
@@ -62,6 +63,14 @@ graph TB
 ```sh
 # Navigate to infrastructure directory
 cd infra
+
+# Configure your AWS account details
+cp terraform.tfvars.example terraform.tfvars
+cp backend.conf.example backend.conf
+
+# Edit these files with your actual AWS account ID and profile name
+# vim terraform.tfvars
+# vim backend.conf
 
 # Complete development setup (checks tools, sets up AWS, initializes Terraform)
 make dev-setup
@@ -214,7 +223,7 @@ make workspace-list
 
 ### State Management
 
-- **Remote State**: Stored in S3 bucket `terraform-state-123456789012`
+- **Remote State**: Stored in S3 bucket `terraform-state-YOUR_ACCOUNT_ID` (configured in backend.conf)
 - **State Locking**: Handled automatically by S3 backend
 - **Encryption**: State is encrypted at rest
 

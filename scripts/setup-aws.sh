@@ -1,9 +1,26 @@
 #!/bin/zsh
 
 # AWS Setup Script - sources credentials into current shell
-# Usage: source ./setup-aws.sh
+# Usage: source ./setup-aws.sh [profile-name]
 
-PROFILE="AdministratorAccess-123456789012"
+# Try to load AWS_PROFILE from .secrets file if not already set
+if [[ -z "$AWS_PROFILE" && -f ".secrets" ]]; then
+    echo "🔍 Loading AWS_PROFILE from .secrets file..."
+    source .secrets
+fi
+
+# Check if AWS_PROFILE is set (after trying to load from .secrets)
+if [[ -z "$AWS_PROFILE" && -z "$1" ]]; then
+    echo "❌ Error: AWS_PROFILE not found in environment, .secrets file, or command arguments"
+    echo "Please either:"
+    echo "  1. Add to .secrets file: echo 'AWS_PROFILE=AdministratorAccess-123456789012' >> .secrets"
+    echo "  2. Set environment variable: export AWS_PROFILE=AdministratorAccess-123456789012"
+    echo "  3. Provide as argument: source ./setup-aws.sh AdministratorAccess-123456789012"
+    return 1
+fi
+
+# Use provided profile or AWS_PROFILE environment variable (now potentially from .secrets)
+PROFILE="${1:-$AWS_PROFILE}"
 
 echo "Setting up AWS credentials..."
 

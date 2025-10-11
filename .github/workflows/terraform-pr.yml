@@ -1,0 +1,176 @@
+name: Terraform PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read # Required to checkout code
+  pull-requests: write # Required to comment on PRs
+
+jobs:
+  terraform-validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./infra
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+          terraform_wrapper: false # Needed for plan output capture
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ./infra/.terraform
+          key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}
+          restore-keys: |
+            terraform-
+
+      - name: Terraform Init
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_aws_profile: "" # Not used in GitHub Actions (OIDC instead)
+        run: |
+          # Create backend configuration from secrets
+          cat > backend.conf << EOF
+          bucket  = "terraform-state-${{ secrets.AWS_ACCOUNT_ID }}"
+          key     = "tally/prod/terraform.tfstate"
+          region  = "us-west-2"
+          encrypt = true
+          EOF
+          terraform init -backend-config=backend.conf
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_aws_profile: "" # Not used in GitHub Actions (OIDC instead)
+        run: |
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan_output.txt
+          echo "plan_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Comment PR with Plan
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && !env.ACT
+        env:
+          PLAN_EXIT_CODE: ${{ steps.plan.outputs.plan_exit_code }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const planPath = path.join(process.cwd(), 'infra', 'plan_output.txt');
+
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync(planPath, 'utf8');
+            } catch (error) {
+              planOutput = 'Unable to read plan output';
+            }
+
+            const exitCode = process.env.PLAN_EXIT_CODE;
+            const planResult = exitCode === '0' ? '✅ Plan succeeded' : 
+                              exitCode === '2' ? '📋 Plan succeeded with changes' : 
+                              '❌ Plan failed';
+
+            // Truncate output if too long for GitHub comment
+            const maxLength = 60000;
+            if (planOutput.length > maxLength) {
+              planOutput = planOutput.substring(0, maxLength) + '\n\n... (output truncated)';
+            }
+
+            const output = `#### Terraform Plan ${planResult}
+
+            <details><summary>Show Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`infra/\`*`;
+
+            // Find existing comment to update
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Terraform Plan')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              });
+            }
+
+      - name: Display Plan Output (Local Testing)
+        if: env.ACT
+        env:
+          PLAN_EXIT_CODE: ${{ steps.plan.outputs.plan_exit_code }}
+        run: |
+          echo "=== Terraform Plan Results ==="
+
+          exitCode="${{ steps.plan.outputs.plan_exit_code }}"
+          if [ "$exitCode" = "0" ]; then
+            echo "✅ Plan succeeded - No changes needed"
+          elif [ "$exitCode" = "2" ]; then
+            echo "📋 Plan succeeded with changes"
+          else
+            echo "❌ Plan failed"
+          fi
+
+          echo ""
+          echo "=== Plan Output ==="
+          if [ -f plan_output.txt ]; then
+            cat plan_output.txt
+          else
+            echo "Plan output file not found"
+          fi
+          echo "=========================="
+
+      - name: Fail on Plan Error
+        if: steps.plan.outputs.plan_exit_code == '1'
+        run: |
+          echo "Terraform plan failed"
+          exit 1

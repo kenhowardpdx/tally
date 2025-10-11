@@ -1,0 +1,38 @@
+# Use the act-optimized image (smaller than full-latest but has Node.js)
+
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Optimize for Apple M-series chips
+
+--container-architecture linux/amd64
+
+# Set GitHub repository context for OIDC (matches your OIDC configuration)
+
+--env GITHUB_REPOSITORY=kenhowardpdx/tally
+--env GITHUB_REPOSITORY_OWNER=kenhowardpdx
+--env GITHUB_REF=refs/heads/main
+--env GITHUB_SHA=fake-sha-for-local-testing
+
+# Mount AWS credentials for local testing (update path for your system)
+
+# --container-options -v /Users/YOUR_USERNAME/.aws:/root/.aws:ro
+
+# Set AWS environment variables for local testing
+
+# AWS_PROFILE is passed via Makefile from .secrets file or environment
+
+--env AWS_DEFAULT_REGION=us-west-2
+
+# Skip OIDC step by setting ACT environment variable
+
+--env ACT=true
+
+# Use host networking to access local services if needed
+
+--container-options --network host
+
+# Alternative images:
+
+# -P ubuntu-latest=ghcr.io/actions/actions-runner:latest # Too minimal - No Node.js
+
+# -P ubuntu-latest=catthehacker/ubuntu:full-latest # Full image - very large

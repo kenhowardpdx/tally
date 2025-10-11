@@ -37,6 +37,8 @@ infra/.terraform/
 infra/.terraform.lock.hcl
 infra/terraform.tfstate
 infra/terraform.tfstate.*
+infra/terraform.tfvars
+infra/backend.conf
 infra/crash.log
 infra/override.tf
 infra/override.tf.json
@@ -52,3 +54,4 @@ docker-compose.override.yml
 
 # VSCode
 .vscode/
+.secrets

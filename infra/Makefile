@@ -21,24 +21,38 @@ aws-setup: ## Configure AWS SSO credentials with caching and expiration handling
 	@echo "🔍 Checking AWS credentials..."
 	@$(MAKE) -s check-aws-smart
 
-# Terraform Commands
+# Terraform Commands with .secrets support
 init: aws-setup ## Initialize Terraform with remote backend
 	@echo "🚀 Initializing Terraform..."
-	@source .aws-credentials && terraform init
+	@if [ -f "../.secrets" ]; then \
+		echo "📁 Loading configuration from .secrets..."; \
+		set -a && source ../.secrets && set +a; \
+		echo "bucket=\"terraform-state-$$TF_VAR_aws_account_id\"" > backend.conf; \
+		echo "key=\"tally/prod/terraform.tfstate\"" >> backend.conf; \
+		echo "region=\"us-west-2\"" >> backend.conf; \
+		echo "encrypt=true" >> backend.conf; \
+		source .aws-credentials && terraform init -backend-config=backend.conf; \
+	else \
+		echo "❌ .secrets file not found. Please create it with TF_VAR_aws_account_id"; \
+		exit 1; \
+	fi
 
 plan: aws-setup ## Create and show Terraform execution plan
 	@echo "📋 Creating Terraform plan..."
-	@source .aws-credentials && terraform plan
+	@if [ -f "../.secrets" ]; then set -a && source ../.secrets && set +a; fi && \
+	 source .aws-credentials && terraform plan
 
 show: aws-setup ## Show current Terraform state
 	@echo "👀 Showing Terraform state..."
-	@source .aws-credentials && terraform show
+	@if [ -f "../.secrets" ]; then set -a && source ../.secrets && set +a; fi && \
+	 source .aws-credentials && terraform show
 
 apply: aws-setup ## Apply Terraform configuration
 	@echo "⚡ Applying Terraform configuration..."
 	@echo "⚠️  This will make changes to your AWS infrastructure!"
 	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@source .aws-credentials && terraform apply
+	@if [ -f "../.secrets" ]; then set -a && source ../.secrets && set +a; fi && \
+	 source .aws-credentials && terraform apply
 
 validate: ## Validate Terraform configuration
 	@echo "✅ Validating Terraform configuration..."
@@ -48,7 +62,8 @@ destroy: aws-setup ## Destroy Terraform-managed infrastructure
 	@echo "💥 Destroying Terraform infrastructure..."
 	@echo "⚠️  This will DELETE all resources managed by Terraform!"
 	@read -p "Are you sure you want to destroy everything? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@source .aws-credentials && terraform destroy
+	@if [ -f "../.secrets" ]; then set -a && source ../.secrets && set +a; fi && \
+	 source .aws-credentials && terraform destroy
 
 # Utility Commands
 fmt: ## Format Terraform files
@@ -89,9 +104,26 @@ check-aws-smart: check ## Smart AWS credential checking with auto-setup
 setup-aws-credentials: ## Internal: Set up and cache AWS credentials
 	@echo "🚀 Setting up AWS SSO credentials..."
 	@echo "⚠️  This will open your browser for AWS SSO authentication"
-	@aws sso login --profile AdministratorAccess-123456789012 || (echo "❌ AWS SSO login failed" && exit 1)
+	@if [ -z "$(AWS_PROFILE)" ]; then \
+		if [ -f "../.secrets" ] && grep -q "^AWS_PROFILE=" "../.secrets"; then \
+			echo "📁 Found AWS_PROFILE in .secrets file, please source it:"; \
+			echo "  source ../.secrets && make aws-setup"; \
+		else \
+			cat <<'EOF' ; \
+❌ Error: AWS_PROFILE not found in environment or ../.secrets file
+Please set AWS_PROFILE:
+  echo 'AWS_PROFILE=AdministratorAccess-123456789012' >> ../.secrets
+  # then source it:
+  source ../.secrets && make aws-setup
+  # or set as environment variable:
+  export AWS_PROFILE=AdministratorAccess-123456789012
+EOF
+		fi; \
+		exit 1; \
+	fi
+	@aws sso login --profile $(AWS_PROFILE) || (echo "❌ AWS SSO login failed" && exit 1)
 	@echo "💾 Exporting and caching credentials..."
-	@aws configure export-credentials --profile AdministratorAccess-123456789012 --format env > .aws-credentials || (echo "❌ Failed to export credentials" && exit 1)
+	@aws configure export-credentials --profile $(AWS_PROFILE) --format env > .aws-credentials || (echo "❌ Failed to export credentials" && exit 1)
 	@echo "# AWS Credentials cached at $$(date)" >> .aws-credentials
 	@echo "# These will be automatically refreshed when expired" >> .aws-credentials
 	@source .aws-credentials && aws sts get-caller-identity > /dev/null 2>&1 || (echo "❌ Credential validation failed" && exit 1)

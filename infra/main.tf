@@ -7,19 +7,18 @@ terraform {
     }
   }
   backend "s3" {
-    bucket  = "terraform-state-123456789012"
-    key     = "tally/prod/terraform.tfstate"
-    region  = "us-west-2"
-    encrypt = true
+    # Backend configuration is provided via init command
+    # Local: make init (uses .secrets)
+    # GitHub Actions: uses repository secrets
   }
 }
 
 provider "aws" {
   region  = var.aws_region
-  profile = "AdministratorAccess-123456789012"
+  profile = var.aws_profile
 
-  # Alternatively, the setup-aws.sh script exports credentials to environment variables
-  # so you can also omit the profile if you source the script first
+  # Alternatively, use environment variables AWS_PROFILE or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+  # The setup-aws.sh script exports credentials to environment variables
 }
 
 # Placeholder modules - commented out until implementation

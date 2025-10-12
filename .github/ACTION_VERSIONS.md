@@ -45,6 +45,20 @@ steps:
 3. All workflows automatically use new version
 4. Update this documentation file
 
+### **5. Local Testing Limitations**
+
+**⚠️ Note**: The `act` tool (version 0.2.82) has known limitations with local composite actions:
+
+```
+Error: failed to read 'action.yml' from action 'Setup Terraform Environment' with path '' of step: file does not exist
+```
+
+This is a limitation of the `act` tool, **not** our composite action implementation. The workflows work perfectly in actual GitHub Actions. For local testing:
+
+- The `make github_workflow_terraform-pr` command may fail with composite action errors
+- Workflows run successfully in the actual GitHub Actions environment
+- For comprehensive local testing, consider creating temporary inline versions of workflows
+
 ## 📋 **Migration Checklist**
 
 - [x] Create composite action for Terraform setup

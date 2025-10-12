@@ -40,12 +40,20 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Use descriptive branch names (feature/description, fix/bug-name)
 - Include tests for new features
 - Update documentation when adding new functionality
+- **Prefer rebase over merge commits**: Use `git rebase origin/main` instead of `git merge` to maintain clean history
 
 #### Pull Request Creation
 - **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`
 - **For simple PRs**: Use inline `--body` with GitHub CLI
 - **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
 - **Use emojis and formatting**: Make PR descriptions clear and scannable with sections, checkboxes, and context
+
+#### Branch Management & Cleanup
+- **Auto-prune setup**: Configure `git config --global fetch.prune true` for automatic cleanup
+- **Regular pruning**: Use `git remote prune origin` to remove stale remote references
+- **Local cleanup**: Delete merged branches with `git branch -d branch-name`
+- **Force delete unmerged**: Use `git branch -D branch-name` for branches with open PRs
+- **Verify cleanup**: Use `git branch -a` to check remaining branches
 
 ## Development Practices
 

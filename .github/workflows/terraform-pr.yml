@@ -21,29 +21,14 @@ jobs:
         working-directory: ./infra
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Configure AWS credentials
-        if: ${{ !env.ACT }}
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Terraform Environment
+        uses: ./.github/actions/setup-terraform
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: latest
-          terraform_wrapper: false # Needed for plan output capture
-
-      - name: Cache Terraform providers
-        uses: actions/cache@v4
-        with:
-          path: ./infra/.terraform
-          key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}
-          restore-keys: |
-            terraform-
+          terraform-version: latest
+          terraform-wrapper: false # Needed for plan output capture
+          working-directory: ./infra
 
       - name: Terraform Init
         env:

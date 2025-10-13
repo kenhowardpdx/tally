@@ -21,16 +21,17 @@ provider "aws" {
   # The setup-aws.sh script exports credentials to environment variables
 }
 
-# VPC Module - Network Foundation
+# VPC Module - Zero-Cost Network Foundation
 module "vpc" {
   source = "./modules/vpc"
 
-  vpc_cidr                  = "10.0.0.0/20"
-  environment               = var.environment
-  project_name              = "tally"
-  availability_zones        = ["${var.aws_region}a", "${var.aws_region}b"]
-  enable_nat_gateway        = true
-  enable_single_nat_gateway = true # Cost optimization - single NAT Gateway
+  vpc_cidr           = "10.0.0.0/20"
+  environment        = var.environment
+  project_name       = "tally"
+  availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
+  
+  # NAT Gateway disabled for zero-cost architecture
+  # Lambda functions will run in public subnets with security groups
 }
 
 # Placeholder modules - commented out until implementation
@@ -38,9 +39,16 @@ module "vpc" {
 
 # module "lambda" {
 #   source = "./modules/lambda"
+#   vpc_id                     = module.vpc.vpc_id
+#   public_subnet_ids          = module.vpc.public_subnet_ids
+#   lambda_security_group_id   = module.vpc.lambda_security_group_id
+# }
+
+# module "rds" {
+#   source = "./modules/rds"
 #   vpc_id                  = module.vpc.vpc_id
-#   private_subnet_ids      = module.vpc.private_subnets
-#   lambda_security_group_id = module.vpc.lambda_security_group_id
+#   database_subnet_ids     = module.vpc.database_subnet_ids
+#   rds_security_group_id   = module.vpc.rds_security_group_id
 # }
 
 # module "api_gateway" {

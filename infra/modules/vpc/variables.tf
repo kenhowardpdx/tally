@@ -22,14 +22,5 @@ variable "availability_zones" {
   default     = ["us-west-2a", "us-west-2b"]
 }
 
-variable "enable_nat_gateway" {
-  description = "Enable NAT Gateway for private subnets"
-  type        = bool
-  default     = true
-}
-
-variable "enable_single_nat_gateway" {
-  description = "Use single NAT Gateway for cost optimization"
-  type        = bool
-  default     = true
-}
+# NAT Gateway variables removed for zero-cost architecture
+# Lambda functions run in public subnets with security group protection

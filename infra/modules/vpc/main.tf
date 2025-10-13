@@ -148,22 +148,13 @@ resource "aws_security_group" "lambda" {
 
   description = "Security group for Lambda functions"
 
-  # Outbound rules
+  # Outbound rules - allow all outbound traffic
   egress {
     description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Outbound to RDS (PostgreSQL)
-  egress {
-    description              = "PostgreSQL to RDS"
-    from_port                = 5432
-    to_port                  = 5432
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.rds.id
   }
 
   tags = {
@@ -183,11 +174,11 @@ resource "aws_security_group" "rds" {
 
   # Inbound from Lambda (PostgreSQL)
   ingress {
-    description              = "PostgreSQL from Lambda"
-    from_port                = 5432
-    to_port                  = 5432
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.lambda.id
+    description     = "PostgreSQL from Lambda"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lambda.id]
   }
 
   tags = {

@@ -160,4 +160,3 @@ For detailed development practices, local testing with GitHub Actions, and debug
 ## Support
 
 For questions or issues, please open an issue on the [GitHub repository](https://github.com/kenhowardpdx/tally/issues).
-# Test comment

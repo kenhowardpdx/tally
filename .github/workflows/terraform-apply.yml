@@ -18,7 +18,7 @@ jobs:
     defaults:
       run:
         working-directory: ./infra
-    
+
     steps:
       - uses: actions/checkout@v5
       - uses: hashicorp/setup-terraform@v3
@@ -27,7 +27,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: terraform-apply-${{ github.run_id }}
           aws-region: us-west-2
-      
+
       - name: Validate
         run: |
           [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment required"; exit 1; }
@@ -36,7 +36,7 @@ jobs:
           terraform fmt -check -recursive
         env:
           TF_VAR_environment: production
-      
+
       - name: Init & Plan
         id: plan
         run: |
@@ -46,13 +46,13 @@ jobs:
           echo "has_changes=$([[ $? -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
         env:
           TF_VAR_environment: production
-      
+
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true'
         run: terraform apply -auto-approve -input=false tfplan
         env:
           TF_VAR_environment: production
-      
+
       - name: Output
         if: success()
         run: |
@@ -62,7 +62,7 @@ jobs:
           else
             echo "✅ No changes needed"
           fi
-      
+
       - name: Cleanup
         if: failure()
         run: rm -f tfplan

@@ -30,17 +30,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - uses: hashicorp/setup-terraform@v3
       - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ !env.ACT }}
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: terraform-apply-${{ github.run_id }}
           aws-region: us-west-2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - uses: actions/cache@v4
+        with:
+          path: ./infra/.terraform
+          key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}
 
       - name: Validate
         run: |
           [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment is required. Please set TF_VAR_environment to the appropriate value (e.g., 'production')."; exit 1; }
-          aws sts get-caller-identity >/dev/null
+          if [[ "$ACT" != "true" ]]; then
+            aws sts get-caller-identity >/dev/null
+          else
+            echo "Skipping AWS validation in ACT"
+          fi
           terraform fmt -check -recursive
         env:
           TF_VAR_environment: ${{ inputs.environment || 'production' }}
@@ -48,34 +59,81 @@ jobs:
       - name: Init & Plan
         id: plan
         run: |
-          cat > backend.conf << EOF
+          if [[ "$ACT" == "true" ]]; then
+            echo "Creating mock backend config for ACT testing"
+            cat > backend.conf << EOF
+          bucket  = "act-test-bucket"
+          key     = "act-test.tfstate"
+          region  = "us-west-2"
+          encrypt = false
+          EOF
+            echo "Initializing with mock config (will fail gracefully)"
+            terraform init -input=false -backend-config=backend.conf || echo "Backend init failed as expected in ACT"
+            echo "Skipping plan in ACT - would require AWS access"
+            echo "plan_exit_code=2" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "ACT testing complete - workflow logic verified"
+          else
+            cat > backend.conf << EOF
           bucket  = "terraform-state-${{ secrets.AWS_ACCOUNT_ID }}"
           key     = "tally/prod/terraform.tfstate"
           region  = "us-west-2"
           encrypt = true
           EOF
-          terraform init -input=false -backend-config=backend.conf
-          terraform validate
-          terraform plan -input=false -out=tfplan -detailed-exitcode
-          plan_exit_code=$?
-          echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+            terraform init -input=false -backend-config=backend.conf
+            terraform validate
+            set +e
+            terraform plan -input=false -out=tfplan -detailed-exitcode
+            plan_exit_code=$?
+            set -e
+            echo "Plan exit code: $plan_exit_code"
+            echo "plan_exit_code=$plan_exit_code" >> $GITHUB_OUTPUT
+            if [[ $plan_exit_code -eq 0 ]]; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            elif [[ $plan_exit_code -eq 2 ]]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "Terraform plan failed with exit code $plan_exit_code"
+              exit $plan_exit_code
+            fi
+          fi
         env:
           TF_VAR_environment: ${{ inputs.environment || 'production' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true'
-        run: terraform apply -auto-approve -input=false tfplan
+        run: |
+          if [[ "$ACT" == "true" ]]; then
+            echo "🧪 DRY RUN: Would apply changes in production"
+            echo "In ACT, skipping actual terraform apply for safety"
+            echo "Plan exit code was: ${{ steps.plan.outputs.plan_exit_code }}"
+            echo "Changes detected: ${{ steps.plan.outputs.has_changes }}"
+          else
+            terraform apply -auto-approve -input=false tfplan
+          fi
         env:
           TF_VAR_environment: ${{ inputs.environment || 'production' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Output
-        if: success()
+        if: success() && !env.ACT
         run: |
           if [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
             echo "✅ Applied $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
             terraform output 2>/dev/null || echo "No outputs"
+          else
+            echo "✅ No changes needed"
+          fi
+
+      - name: Local Output
+        if: env.ACT
+        run: |
+          echo "Plan exit code: ${{ steps.plan.outputs.plan_exit_code }}"
+          echo "Has changes: ${{ steps.plan.outputs.has_changes }}"
+          if [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
+            echo "✅ Would apply changes in production"
+            terraform show tfplan 2>/dev/null || echo "No plan file"
           else
             echo "✅ No changes needed"
           fi

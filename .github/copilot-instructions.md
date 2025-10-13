@@ -12,6 +12,26 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - **Authentication**: Auth0 integration
 - **Infrastructure**: Terraform for AWS resource management
 
+## Cost Management Philosophy
+
+**This project prioritizes cost optimization for solo developers without VC funding.**
+
+### Cost-First Design Principles
+
+- **Zero unnecessary AWS costs**: Eliminate NAT Gateways, unused Elastic IPs, and expensive services
+- **Leverage AWS Free Tier**: Maximize usage of free services and resource limits
+- **Public subnet architecture**: Lambda functions in public subnets (with security groups) vs private + NAT Gateway
+- **Conservative resource sizing**: Use minimal CIDR ranges, single-AZ deployments where appropriate
+- **Cost-aware alternatives**: Choose managed services only when they provide clear value over self-managed options
+
+### Infrastructure Cost Guidelines
+
+- **VPC Architecture**: Public subnets + security groups instead of private subnets + NAT Gateway (saves $588/year)
+- **Database**: Consider RDS Free Tier limits, use db.t3.micro or similar cost-effective instances
+- **Lambda**: Stay within generous free tier limits (1M requests, 400,000 GB-seconds per month)
+- **Storage**: Use S3 Standard-IA or Glacier for infrequent access, lifecycle policies for cost optimization
+- **Monitoring**: Use CloudWatch Free Tier, avoid unnecessary custom metrics and dashboards
+
 ## Code Style and Conventions
 
 ### Python (Backend)
@@ -32,6 +52,17 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Use variables.tf and outputs.tf for module interfaces
 - Include comprehensive resource tagging
 - Use data sources for existing resources when possible
+- **Cost optimization first**: Always consider monthly costs before adding resources
+- **Favor free-tier resources**: VPC subnets, security groups, route tables are free
+- **Avoid cost generators**: NAT Gateways ($45/month), Elastic IPs ($3.65/month), excessive data transfer
+
+### File Formatting
+
+- **Always end files with a single empty line** - This is a POSIX standard and helps with clean diffs
+- Use consistent indentation (2 spaces for YAML/HCL, 4 spaces for Python)
+- Remove trailing whitespace
+- Use Unix line endings (LF)
+- Keep line lengths reasonable (80-120 characters)
 
 ### Git Workflow
 
@@ -75,6 +106,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Test GitHub Actions locally using `act` (use Makefile targets like `make github_workflow_terraform-pr`)
 - Validate Terraform changes locally before committing
 - Run tests before pushing changes
+- **Always check costs**: Use `terraform plan` and AWS cost calculators before deploying resources
 
 #### .secrets File Pattern
 
@@ -174,6 +206,70 @@ If sensitive data is accidentally committed:
 ├── scripts/         # Utility scripts
 ├── docs/           # Documentation
 └── .github/        # GitHub configuration and workflows
+```
+
+## Cost Management Patterns
+
+### Zero-Cost VPC Architecture
+
+```hcl
+# ✅ COST-FREE: Public subnets + security groups
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  map_public_ip_on_launch = true
+  # Lambda functions run here with security group protection
+}
+
+resource "aws_security_group" "lambda" {
+  # Provides same security as private subnet + NAT Gateway
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# ❌ EXPENSIVE: Avoid these cost generators
+# resource "aws_nat_gateway" "main" {
+#   # Costs $45/month + data processing fees
+# }
+# resource "aws_eip" "nat" {
+#   # Costs $3.65/month per IP
+# }
+```
+
+### Cost-Aware Resource Sizing
+
+```hcl
+# ✅ CONSERVATIVE: Minimal CIDR for solo developer
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/20"  # 4,096 IPs vs 65,536
+}
+
+# ✅ FREE TIER: Use smallest viable instances
+resource "aws_db_instance" "main" {
+  instance_class = "db.t3.micro"  # Free tier eligible
+  allocated_storage = 20          # Free tier limit
+}
+
+# ❌ EXPENSIVE: Avoid over-provisioning
+# cidr_block = "10.0.0.0/16"     # 65K IPs - excessive for solo dev
+# instance_class = "db.r5.large" # $200+/month
+```
+
+### Cost Monitoring Tags
+
+```hcl
+# Always include cost tracking tags
+resource "aws_lambda_function" "api" {
+  tags = {
+    Environment = var.environment
+    Project     = "tally"
+    CostCenter  = "solo-developer"
+    Purpose     = "api-backend"
+  }
+}
 ```
 
 ## Common Patterns

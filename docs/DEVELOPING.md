@@ -1,6 +1,35 @@
+
 # Development Guide
 
-This guide covers local development practices and tools for the Tally project.
+This guide helps you set up Tally for local development, workflow testing, and infrastructure management.
+
+## Project Overview
+
+Tally is a financial application for managing recurring bills and forecasting bank account balances. The backend is built with Python (FastAPI), infrastructure is managed with Terraform on AWS, and CI/CD is handled by GitHub Actions (locally tested with act).
+
+## Prerequisites
+
+- Python 3.13+
+- Poetry
+- Docker
+- act
+- AWS CLI
+
+## First-time Setup
+
+1. Clone the repo
+2. Install Python dependencies: `poetry install`
+3. Set up AWS credentials: `make -C infra aws-credentials`
+4. Start Docker
+5. Run tests: `make test`
+6. Run workflows locally: `make github_workflow_terraform-pr`
+
+## Security
+
+- Never commit secrets or credentials.
+- Use `.secrets` for sensitive values (already in `.gitignore`).
+
+---
 
 ## Local GitHub Actions Testing with Act
 
@@ -139,19 +168,27 @@ Create a `.actrc` file in the project root:
 # -P ubuntu-latest=catthehacker/ubuntu:act-latest-micro
 ```
 
-#### Secrets and Environment Variables
 
-Our Makefile targets automatically handle secrets and environment variables for workflows that need AWS access:
+#### AWS Credentials Setup
 
-**Using the Makefile (Recommended):**
-
-The Makefile targets automatically use a `.secrets` file and mount AWS credentials. Create a `.secrets` file in the project root:
+Before running any workflow locally, ensure your `~/.aws/credentials` file is in the correct INI format. Use the Makefile target:
 
 ```bash
-# .secrets file (this file is in .gitignore)
-AWS_ROLE_ARN=arn:aws:iam::YOUR_ACCOUNT:role/your-github-actions-role
-AWS_PROFILE=YourProfileName
+make -C infra aws-credentials
 ```
+
+This runs `scripts/export-aws-credentials.sh`, which logs in to AWS SSO using your profile from `.secrets` and exports credentials in the required INI format for Terraform, ACT, and AWS CLI.
+
+Your `~/.aws/credentials` file should look like:
+
+```ini
+[default]
+aws_access_key_id=...
+aws_secret_access_key=...
+aws_session_token=...
+```
+
+**Run this before any ACT or Makefile workflow targets.**
 
 **Manual act usage:**
 
@@ -257,6 +294,9 @@ We've integrated act testing into our Makefile for a streamlined developer exper
 #### Available Targets
 
 ```bash
+# Export AWS credentials to ~/.aws/credentials
+make aws-credentials
+
 # List all available make targets
 make help
 
@@ -297,7 +337,47 @@ export AWS_PROFILE=YourAWSProfileName
 AWS_PROFILE=YourProfile make github_workflow_terraform-pr
 ```
 
-### Best Practices
+## ACT vs CI/CD Workflow Logic
+
+### How ACT/local and CI/CD are handled
+
+Our workflows are designed to work seamlessly both locally (using ACT) and in CI/CD (GitHub Actions):
+
+- **ACT/local runs:**
+
+  - ACT automatically sets the `ACT` environment variable to `true`.
+  - The workflow uses shell conditionals (`[ "$ACT" = "true" ]`) inside `run:` blocks to detect ACT/local runs.
+  - AWS credentials are injected as environment variables by ACT, sourced from your local `~/.aws/credentials` and `.secrets` file.
+  - The Makefile targets (`act-plan`, `act-apply`) mount your AWS credentials and source `.secrets` for ACT runs.
+  - The backend is switched to local by running `make init-local`.
+
+- **CI/CD runs:**
+  - The workflow runs in GitHub Actions, where `ACT` is not set.
+  - AWS credentials are configured using `aws-actions/configure-aws-credentials` and secrets from the repository.
+  - The backend is switched to S3 by copying the backend config and running `terraform init -backend-config=backend.conf`.
+
+### Credential Propagation
+
+- For ACT/local, credentials are read from your local environment and injected by ACT.
+- For CI/CD, credentials are provided via GitHub secrets and configured by the workflow.
+
+### Backend Switching
+
+- Local runs use a local backend to avoid S3 and AWS charges.
+- CI/CD runs use the S3 backend for remote state management.
+
+### Troubleshooting
+
+- If ACT fails due to missing credentials, ensure your `~/.aws/credentials` and `.secrets` files are present and correctly formatted.
+- If backend switching fails, use `make clean-terraform` to reset state and re-init.
+
+### Example ACT Command
+
+```bash
+make act-plan  # Runs the Terraform PR workflow locally with proper credentials and backend
+```
+
+For more details, see the workflow and Makefile comments.
 
 1. **Test locally before pushing:** Always run workflows locally to catch issues early
 2. **Use Makefile targets:** `make github_workflow_*` provides the best experience with proper AWS setup

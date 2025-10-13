@@ -18,6 +18,7 @@
 
 act-plan: ## Run GitHub Actions workflow (terraform-pr) with AWS creds (from project root, mounts ~/.aws)
 	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
+	[ -f "$$HOME/.aws/credentials" ] || { echo "❌ ~/.aws/credentials not found or not mounted. ACT will fail. See docs for setup."; exit 1; }
 	set -a && source ../.secrets && set +a && \
 	ACT_ENV="AWS_PROFILE=$$AWS_PROFILE AWS_ROLE_ARN=$$AWS_ROLE_ARN TF_VAR_aws_account_id=$$TF_VAR_aws_account_id TF_VAR_aws_profile=$$TF_VAR_aws_profile" && \
 	echo "Running: (cd .. && act -j validate --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
@@ -33,6 +34,7 @@ act-plan: ## Run GitHub Actions workflow (terraform-pr) with AWS creds (from pro
 
 act-apply: ## Run GitHub Actions workflow (terraform-apply) with AWS creds (from project root, mounts ~/.aws)
 	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
+	[ -f "$$HOME/.aws/credentials" ] || { echo "❌ ~/.aws/credentials not found or not mounted. ACT will fail. See docs for setup."; exit 1; }
 	set -a && source ../.secrets && set +a && \
 	ACT_ENV="AWS_PROFILE=$$AWS_PROFILE AWS_ROLE_ARN=$$AWS_ROLE_ARN TF_VAR_aws_account_id=$$TF_VAR_aws_account_id TF_VAR_aws_profile=$$TF_VAR_aws_profile" && \
 	echo "Running: (cd .. && act -j apply --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
@@ -41,7 +43,10 @@ act-apply: ## Run GitHub Actions workflow (terraform-apply) with AWS creds (from
 # NOTE: For local development and ACT runs, use 'make init-local' to avoid S3 backend issues.
 # 'make init' is ONLY for remote/CI use and will configure the S3 backend.
 
-.PHONY: help aws-setup init init-local plan show apply validate destroy clean fmt check clean-terraform
+.PHONY: help aws-setup aws-credentials init init-local plan show apply validate destroy clean fmt check clean-terraform
+# Export AWS SSO credentials to ~/.aws/credentials in INI format
+aws-credentials: ## Export AWS SSO credentials to ~/.aws/credentials in INI format
+	@../scripts/export-aws-credentials.sh
 clean-terraform: ## Remove all Terraform state, lock, and backend config files (safe local reset)
 	@echo "Removing .terraform, .terraform.lock.hcl, backend.conf, backend.conf.json..."
 	rm -rf .terraform .terraform.lock.hcl backend.conf ../.github/workflows/backend.conf.json

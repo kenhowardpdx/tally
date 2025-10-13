@@ -337,6 +337,58 @@ AWS_PROFILE=YourProfile make github_workflow_terraform-pr
    act pull_request
    ```
 
+### Accessing RDS PostgreSQL via Bastion Host
+
+## Retrieve the Database Password
+
+The RDS password is stored in AWS Secrets Manager:
+
+```bash
+aws secretsmanager get-secret-value --secret-id prod-rds-postgres-password --query 'SecretString' --output text
+```
+
+## Connect to the Bastion Host
+
+1. Get the bastion host public IP from Terraform output or AWS Console.
+2. SSH into the bastion host:
+
+```bash
+ssh -i /path/to/your-ssh-key.pem ec2-user@<bastion_public_ip>
+```
+
+## Connect to RDS from Bastion Host
+
+Once on the bastion host, use psql or any PostgreSQL client:
+
+```bash
+psql -h <rds_endpoint> -U admin -d tally
+```
+
+- `<rds_endpoint>`: Get from Terraform output or AWS Console
+- `admin`: Default username
+- `tally`: Default database name
+- Password: Retrieve from Secrets Manager as above
+
+## SSH Port Forwarding (Optional)
+
+To connect to RDS from your local machine via the bastion:
+
+```bash
+ssh -i /path/to/your-ssh-key.pem -L 5432:<rds_endpoint>:5432 ec2-user@<bastion_public_ip>
+```
+
+Then connect locally:
+
+```bash
+psql -h localhost -U admin -d tally
+```
+
+## Security Notes
+
+- Bastion host should be stopped when not needed to minimize costs.
+- Restrict SSH access to your IP in the bastion security group.
+- Never expose RDS directly to the public internet.
+
 ### Additional Resources
 
 - [Act Documentation](https://github.com/nektos/act)

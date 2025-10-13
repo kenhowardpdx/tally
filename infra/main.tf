@@ -61,7 +61,6 @@ module "rds" {
 
 module "bastion" {
   source            = "./modules/bastion"
-  ami_id            = "ami-0f8e5a5f2c3b8a8a6" # Amazon Linux 2 (us-west-2, Oct 2025)
   subnet_id         = module.vpc.public_subnet_ids[0]
   security_group_id = module.vpc.lambda_security_group_id
   key_name          = "tally-bastion-key-prod" # Project-specific SSH key name

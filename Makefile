@@ -30,9 +30,6 @@ help: ## Show this help message
 github_workflow_terraform-pr: ## Run the Terraform PR validation workflow
 	@$(MAKE) .github_workflow_terraform-pr
 
-github_workflow_terraform-pr-local: ## Run the Terraform PR validation workflow (same as main, keeping for compatibility)
-	@$(MAKE) .github_workflow_terraform-pr
-
 github_workflow_ci: ## Run the CI workflow
 	@$(MAKE) .github_workflow_ci
 

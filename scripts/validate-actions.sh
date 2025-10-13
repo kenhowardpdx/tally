@@ -14,6 +14,9 @@ NC='\033[0m' # No Color
 # Configuration
 CONFIG_FILE=".github/action-versions.conf"
 WORKFLOWS_DIR=".github/workflows"
+
+# Global tracking files for action usage
+TEMP_ACTIONS_FILE=$(mktemp)
 TEMP_FILE="/tmp/approved-versions-$$"
 
 print_header() {
@@ -72,7 +75,56 @@ get_approved_version() {
 }
 
 cleanup() {
-    rm -f "$TEMP_FILE"
+    rm -f "$TEMP_FILE" "$TEMP_ACTIONS_FILE"
+}
+
+track_action_usage() {
+    local action="$1"
+    local version="$2"
+    local file="$3"
+    
+    # Store in temp file: action|version|file
+    echo "$action|$version|$file" >> "$TEMP_ACTIONS_FILE"
+}
+
+check_consistency() {
+    local inconsistencies=0
+    
+    if [[ ! -f "$TEMP_ACTIONS_FILE" ]]; then
+        return 0
+    fi
+    
+    print_info "Checking action version consistency..."
+    
+    # Get unique actions
+    local actions
+    actions=$(cut -d'|' -f1 "$TEMP_ACTIONS_FILE" | sort -u)
+    
+    while IFS= read -r action; do
+        if [[ -z "$action" ]]; then
+            continue
+        fi
+        
+        # Get all versions for this action
+        local versions
+        versions=$(grep "^$action|" "$TEMP_ACTIONS_FILE" | cut -d'|' -f2 | sort -u)
+        local version_count
+        version_count=$(echo "$versions" | wc -l | tr -d ' ')
+        
+        if [[ $version_count -gt 1 ]]; then
+            print_error "❌ Action '$action' has inconsistent versions:"
+            while IFS= read -r version; do
+                if [[ -n "$version" ]]; then
+                    local files
+                    files=$(grep "^$action|$version|" "$TEMP_ACTIONS_FILE" | cut -d'|' -f3 | tr '\n' ',' | sed 's/,$//')
+                    print_error "   Version $version used in: $files"
+                fi
+            done <<< "$versions"
+            ((inconsistencies++))
+        fi
+    done <<< "$actions"
+    
+    return $inconsistencies
 }
 
 validate_workflow_file() {
@@ -90,6 +142,9 @@ validate_workflow_file() {
             # Clean up any quotes
             action=$(echo "$action" | tr -d '"'"'"'')
             version=$(echo "$version" | tr -d '"'"'"'')
+            
+            # Track all action usage for consistency checking
+            track_action_usage "$action" "$version" "$workflow_file"
             
             local expected_version
             expected_version=$(get_approved_version "$action")
@@ -134,6 +189,12 @@ validate_all_workflows() {
         return 1
     fi
     
+    # Check for consistency across all actions
+    echo "=================================================="
+    check_consistency
+    local consistency_errors=$?
+    ((total_errors += consistency_errors))
+    
     echo "=================================================="
     if [[ $total_errors -eq 0 ]]; then
         print_success "All $workflow_count workflow files passed validation! 🎉"
@@ -141,12 +202,13 @@ validate_all_workflows() {
         print_info "To update approved versions, edit: $CONFIG_FILE"
         return 0
     else
-        print_error "Found $total_errors version violations in $workflow_count workflow files"
+        print_error "Found $total_errors total violations in $workflow_count workflow files"
         echo ""
         echo "💡 To fix these issues:"
         echo "   1. Update the workflow files to use approved versions"
-        echo "   2. Or update $CONFIG_FILE if new versions are approved"
-        echo "   3. Run 'make validate-actions' to re-check"
+        echo "   2. Ensure consistent versions for the same actions across files"
+        echo "   3. Or update $CONFIG_FILE if new versions are approved"
+        echo "   4. Run 'make validate-actions' to re-check"
         return 1
     fi
 }

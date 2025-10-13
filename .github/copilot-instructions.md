@@ -316,11 +316,12 @@ gh pr status
 ### Copilot Review Comments
 
 When Copilot provides review comments on PRs:
+
 1. Use the API approach above to get specific line-by-line feedback
 2. Address each comment systematically
 3. Common issues Copilot flags:
    - Redundant code patterns
-   - Formatting inconsistencies  
+   - Formatting inconsistencies
    - Accidental test/debug code
    - Security concerns
    - Performance optimizations

@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
     paths: ["infra/**"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
 
 concurrency:
   group: terraform-apply-production
@@ -34,7 +43,7 @@ jobs:
           aws sts get-caller-identity >/dev/null
           terraform fmt -check -recursive
         env:
-          TF_VAR_environment: production
+          TF_VAR_environment: ${{ inputs.environment || 'production' }}
 
       - name: Init & Plan
         id: plan
@@ -51,14 +60,14 @@ jobs:
           plan_exit_code=$?
           echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
         env:
-          TF_VAR_environment: production
+          TF_VAR_environment: ${{ inputs.environment || 'production' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true'
         run: terraform apply -auto-approve -input=false tfplan
         env:
-          TF_VAR_environment: production
+          TF_VAR_environment: ${{ inputs.environment || 'production' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Output

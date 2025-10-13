@@ -49,7 +49,7 @@ module "rds" {
   db_name            = "tally"
   db_username        = "admin"
   db_password        = "example-password" # Replace with reference to Secrets Manager in production
-  db_subnet_group    = "tally-db-subnet-group"
+  db_subnet_group    = module.vpc.db_subnet_group
   security_group_ids = [module.vpc.rds_security_group_id]
   tags = {
     Environment = var.environment
@@ -61,7 +61,7 @@ module "rds" {
 
 module "bastion" {
   source            = "./modules/bastion"
-  ami_id            = "ami-0c94855ba95c71c99" # Amazon Linux 2 (us-west-2)
+  ami_id            = "ami-0f8e5a5f2c3b8a8a6" # Amazon Linux 2 (us-west-2, Oct 2025)
   subnet_id         = module.vpc.public_subnet_ids[0]
   security_group_id = module.vpc.lambda_security_group_id
   key_name          = "tally-bastion-key-prod" # Project-specific SSH key name

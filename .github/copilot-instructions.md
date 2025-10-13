@@ -41,6 +41,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Include tests for new features
 - Update documentation when adding new functionality
 - **Prefer rebase over merge commits**: Use `git rebase origin/main` instead of `git merge` to maintain clean history
+- **Avoid merge commits**: When resolving conflicts, always use rebase (`git rebase origin/main`) instead of merge commits
 
 #### Pull Request Creation
 - **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`

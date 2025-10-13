@@ -534,7 +534,7 @@ Use `make github_workflow_terraform-pr` to test workflows locally before pushing
 
 Use curl with GitHub API for reliable, non-interactive access:
 
-````bash
+```bash
 # ✅ CORRECT - Use curl for PR comments
 curl -s -H "Authorization: token $(gh auth token)" \
   "https://api.github.com/repos/kenhowardpdx/tally/pulls/<pr-number>/comments" | \

@@ -56,10 +56,11 @@ check-aws-smart: check ## Smart AWS credential checking with auto-setup
 	 aws sts get-caller-identity >/dev/null 2>&1 || $(MAKE) -s setup-aws-credentials
 
 setup-aws-credentials: ## Internal: Set up and cache AWS credentials
-	@[ -n "$(AWS_PROFILE)" ] || { echo "❌ AWS_PROFILE required. Add to ../.secrets or export"; exit 1; }
-	@aws sso login --profile $(AWS_PROFILE)
-	@aws configure export-credentials --profile $(AWS_PROFILE) --format env > .aws-credentials
-	@echo "# Cached at $$(date)" >> .aws-credentials
+	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a; \
+	 [ -n "$$AWS_PROFILE" ] || { echo "❌ AWS_PROFILE required. Add to ../.secrets or export"; exit 1; }; \
+	 aws sso login --profile "$$AWS_PROFILE" && \
+	 aws configure export-credentials --profile "$$AWS_PROFILE" --format env > .aws-credentials && \
+	 echo "# Cached at $$(date)" >> .aws-credentials
 
 workspace-list: aws-setup ## List Terraform workspaces
 	@source .aws-credentials && terraform workspace list

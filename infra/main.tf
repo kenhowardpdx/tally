@@ -44,12 +44,20 @@ module "vpc" {
 #   lambda_security_group_id   = module.vpc.lambda_security_group_id
 # }
 
-# module "rds" {
-#   source = "./modules/rds"
-#   vpc_id                  = module.vpc.vpc_id
-#   database_subnet_ids     = module.vpc.database_subnet_ids
-#   rds_security_group_id   = module.vpc.rds_security_group_id
-# }
+module "rds" {
+  source             = "./modules/rds"
+  db_name            = "tally"
+  db_username        = "admin"
+  db_password        = "example-password" # Replace with reference to Secrets Manager in production
+  db_subnet_group    = "tally-db-subnet-group"
+  security_group_ids = [module.vpc.rds_security_group_id]
+  tags = {
+    Environment = var.environment
+    Project     = "tally"
+    Purpose     = "rds"
+  }
+  environment = var.environment
+}
 
 # module "api_gateway" {
 #   source = "./modules/api_gateway"

@@ -144,7 +144,8 @@ The `.secrets` file contains **required** configuration for local development:
 
 **GitHub Actions**: Uses repository secrets (`AWS_ACCOUNT_ID`, `AWS_ROLE_ARN`) instead of the `.secrets` file.
 
-**Important**: 
+**Important**:
+
 - The `.secrets` file is included in `.gitignore` and should never be committed to version control
 - Required variables must be set - commands will fail with clear error messages if missing
 

@@ -10,22 +10,15 @@ help: ## Show this help message
 
 # GitHub workflow testing with act
 .github_workflow_%:
-	@echo "Running GitHub Actions workflow: $*"
 	@if [ ! -f .github/workflows/$*.yml ]; then \
-		echo "Error: Workflow file '.github/workflows/$*.yml' not found"; \
-		echo "Available workflows:"; \
+		echo "Error: Workflow '.github/workflows/$*.yml' not found"; \
 		ls -1 .github/workflows/*.yml | sed 's|.github/workflows/||' | sed 's|\.yml$$||'; \
 		exit 1; \
 	fi
 	@if [ -z "$$AWS_PROFILE" ] && ! grep -q "^AWS_PROFILE=" .secrets 2>/dev/null; then \
-		echo "Error: AWS_PROFILE not found in environment or .secrets file"; \
-		echo "Please add AWS_PROFILE to your .secrets file:"; \
-		echo "  echo 'AWS_PROFILE=AdministratorAccess-123456789012' >> .secrets"; \
-		echo "  # or set as environment variable:"; \
-		echo "  export AWS_PROFILE=AdministratorAccess-123456789012"; \
+		echo "Error: AWS_PROFILE not found. Add to .secrets or environment."; \
 		exit 1; \
 	fi
-	@echo "Using local AWS credentials and environment..."
 	act pull_request \
 		--secret-file .secrets \
 		--container-options "-v $(HOME)/.aws:/root/.aws:ro" \
@@ -42,5 +35,36 @@ github_workflow_ci: ## Run the CI workflow
 
 # List available workflows
 list-workflows: ## List all available GitHub workflows
-	@echo "Available GitHub workflows:"
-	@ls -1 .github/workflows/*.yml | sed 's|.github/workflows/||' | sed 's|\.yml$$||' | sed 's/^/  - github_workflow_/'
+	@ls -1 .github/workflows/*.yml | sed 's|.github/workflows/||' | sed 's|\.yml$$||' | sed 's/^/github_workflow_/'
+
+# Pre-commit validation
+pre-commit: ## Run all pre-commit validations
+	@$(MAKE) validate-actions
+
+# GitHub Actions validation
+validate-actions: ## Validate GitHub Actions versions against approved list
+	@./scripts/validate-actions.sh
+
+show-action-versions: ## Display all approved GitHub Actions versions
+	@maxlen=$$(grep -v "^#" .github/action-versions.conf | grep -v "^$$" | awk -F':' '{print length($$1)}' | sort -nr | head -n1); \
+	grep -v "^#" .github/action-versions.conf | grep -v "^$$" | while IFS=':' read -r action version; do \
+		printf "%-$${maxlen}s %s\n" "$$action" "$$version"; \
+	done
+
+show-current-usage: ## Show which action versions are currently used in workflows
+	@find .github/workflows -name "*.yml" -o -name "*.yaml" | while read -r file; do \
+		echo "$$file:"; \
+		grep -n "uses:" "$$file" | sed 's/^/  /' || true; \
+		echo ""; \
+	done
+
+install-git-hooks: ## Install git hooks for pre-commit validation
+	@mkdir -p .git/hooks
+	@echo '#!/bin/bash' > .git/hooks/pre-commit
+	@echo 'make pre-commit' >> .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Git hooks installed"
+
+uninstall-git-hooks: ## Remove git hooks
+	@rm -f .git/hooks/pre-commit
+	@echo "Git hooks removed"

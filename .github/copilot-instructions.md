@@ -40,12 +40,30 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Use descriptive branch names (feature/description, fix/bug-name)
 - Include tests for new features
 - Update documentation when adding new functionality
+- **Prefer rebase over merge commits**: Use `git rebase origin/main` instead of `git merge` to maintain clean history
+- **Avoid merge commits**: When resolving conflicts, always use rebase (`git rebase origin/main`) instead of merge commits
 
 #### Pull Request Creation
 - **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`
 - **For simple PRs**: Use inline `--body` with GitHub CLI
 - **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
 - **Use emojis and formatting**: Make PR descriptions clear and scannable with sections, checkboxes, and context
+
+### GitHub Actions Version Management
+
+- All GitHub Actions versions are centrally managed in `.github/action-versions.conf`
+- Use `make validate-actions` to check that all workflows use approved versions
+- Install git hooks with `make install-git-hooks` to automatically validate on commits
+- Update `.github/action-versions.conf` when approving new action versions
+- The validation script at `scripts/validate-actions.sh` enforces version consistency
+
+#### Branch Management & Cleanup
+
+- **Auto-prune setup**: Configure `git config --global fetch.prune true` for automatic cleanup
+- **Regular pruning**: Use `git remote prune origin` to remove stale remote references
+- **Local cleanup**: Delete merged branches with `git branch -d branch-name`
+- **Force delete unmerged**: Use `git branch -D branch-name` for branches with open PRs
+- **Verify cleanup**: Use `git branch -a` to check remaining branches
 
 ## Development Practices
 
@@ -272,6 +290,44 @@ logger.error("Error processing request", exc_info=True)
 - Checks formatting and runs terraform plan
 
 Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
+
+## GitHub CLI and PR Management
+
+### Accessing PR Comments and Reviews
+
+When working with pull requests, use the GitHub CLI in non-interactive mode to access comments and reviews:
+
+```bash
+# View PR details without interactive prompts
+TERM=dumb gh pr view <pr-number> --comments
+
+# Get specific review/comment data using the API
+# Replace 'owner' and 'repo' with your actual repository owner and name
+gh api repos/owner/repo/pulls/<pr-number>/comments
+
+# Extract specific comment details with jq
+# Replace 'owner' and 'repo' with your actual repository owner and name
+gh api repos/owner/repo/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+
+# List PRs for current branch
+gh pr list --head <branch-name>
+
+# Get PR status information
+gh pr status
+```
+
+### Copilot Review Comments
+
+When Copilot provides review comments on PRs:
+
+1. Use the API approach above to get specific line-by-line feedback
+2. Address each comment systematically
+3. Common issues Copilot flags:
+   - Redundant code patterns
+   - Formatting inconsistencies
+   - Accidental test/debug code
+   - Security concerns
+   - Performance optimizations
 
 ---
 

@@ -1,3 +1,9 @@
+# IMPORTANT: Always use 'make plan' for AWS authentication.
+# NEVER run 'make apply' locally except through testing workflows with ACT.
+# This prevents accidental infrastructure changes and unexpected AWS charges.
+# For real deployments, use GitHub Actions workflows only.
+# Do NOT run 'terraform apply' or 'make apply' directly unless you are in a safe test environment.
+
 # Terraform Infrastructure Makefile
 
 .PHONY: help aws-setup init plan show apply validate destroy clean fmt check
@@ -22,8 +28,11 @@ show: aws-setup ## Show current Terraform state
 	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform show
 
-apply: aws-setup ## Apply Terraform configuration
-	@read -p "Apply changes? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+apply: aws-setup ## Apply Terraform configuration (only in CI or manual trigger, and if Terraform files changed)
+	@if [ -z "$$GITHUB_ACTIONS" ] && [ -z "$$MANUAL_TF_APPLY" ]; then \
+		echo "❌ Refusing to run apply: Only allowed in GitHub Actions CI or with MANUAL_TF_APPLY=1"; \
+		exit 1; \
+	fi
 	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform apply
 

@@ -32,7 +32,10 @@ jobs:
         run: |
           [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment required"; exit 1; }
           aws sts get-caller-identity >/dev/null
-          [ ! -f backend.conf.example ] || [ -f backend.conf ] || { echo "backend.conf required"; exit 1; }
+          if [ -f backend.conf.example ] && [ ! -f backend.conf ]; then
+            echo "backend.conf is required when backend.conf.example exists. Please create backend.conf based on backend.conf.example."
+            exit 1
+          fi
           terraform fmt -check -recursive
         env:
           TF_VAR_environment: production
@@ -40,7 +43,11 @@ jobs:
       - name: Init & Plan
         id: plan
         run: |
-          terraform init -input=false
+          if [ -f backend.conf ]; then
+            terraform init -input=false -backend-config=backend.conf
+          else
+            terraform init -input=false
+          fi
           terraform validate
           terraform plan -input=false -out=tfplan -detailed-exitcode
           echo "has_changes=$([[ $? -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT

@@ -49,9 +49,8 @@ jobs:
       - name: Plan
         id: plan
         run: |
-          set -o pipefail
-          terraform plan -no-color -out=tfplan > plan.txt 2>&1
-          exit_code=$?
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan.txt
+          exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}

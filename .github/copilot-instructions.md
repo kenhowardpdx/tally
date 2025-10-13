@@ -442,10 +442,11 @@ gh pr status
 When Copilot provides review comments on PRs:
 
 1. **Get specific line-by-line feedback** using the API command above
-2. **Address each comment systematically** with focused commits  
+2. **Address each comment systematically** with focused commits
 3. **Use conventional commit format** for review fixes (e.g., `fix: address copilot PR review feedback`)
 
 **Example workflow:**
+
 ```bash
 # Get PR comments for review
 gh api repos/kenhowardpdx/tally/pulls/31/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
@@ -457,8 +458,9 @@ git push
 ```
 
 **Common issues Copilot flags:**
+
 - Redundant code patterns
-- Formatting inconsistencies  
+- Formatting inconsistencies
 - Accidental test/debug code
 - Security concerns
 - Performance optimizations

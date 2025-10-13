@@ -47,6 +47,9 @@ infra/.terraformrc
 infra/terraform.rc
 infra/.aws-credentials
 
+# Ignore plan file
+infra/tfplan
+
 # Docker
 **/tmp/
 **/logs/

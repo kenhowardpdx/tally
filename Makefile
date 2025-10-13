@@ -37,6 +37,9 @@ help: ## Show this help message
 github_workflow_terraform-pr: ## Run the Terraform PR validation workflow
 	@$(MAKE) .github_workflow_terraform-pr
 
+github_workflow_terraform-pr-local: ## Run the Terraform PR validation workflow (same as main, keeping for compatibility)
+	@$(MAKE) .github_workflow_terraform-pr
+
 github_workflow_ci: ## Run the CI workflow
 	@$(MAKE) .github_workflow_ci
 
@@ -44,3 +47,23 @@ github_workflow_ci: ## Run the CI workflow
 list-workflows: ## List all available GitHub workflows
 	@echo "Available GitHub workflows:"
 	@ls -1 .github/workflows/*.yml | sed 's|.github/workflows/||' | sed 's|\.yml$$||' | sed 's/^/  - github_workflow_/'
+
+# GitHub Actions validation
+validate-actions: ## Validate GitHub Actions versions against approved list
+	@./scripts/validate-actions.sh
+
+install-git-hooks: ## Install git hooks for action version validation
+	@echo "🔧 Installing git hooks..."
+	@mkdir -p .git/hooks
+	@echo '#!/bin/bash' > .git/hooks/pre-commit
+	@echo 'echo "🔍 Running pre-commit validation..."' >> .git/hooks/pre-commit
+	@echo './scripts/validate-actions.sh' >> .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "✅ Git hooks installed successfully!"
+	@echo "   - Pre-commit hook will validate action versions"
+	@echo "   - Run 'make validate-actions' manually to test"
+
+uninstall-git-hooks: ## Remove git hooks
+	@echo "🗑️  Removing git hooks..."
+	@rm -f .git/hooks/pre-commit
+	@echo "✅ Git hooks removed"

@@ -48,7 +48,16 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
 - **Use emojis and formatting**: Make PR descriptions clear and scannable with sections, checkboxes, and context
 
+### GitHub Actions Version Management
+
+- All GitHub Actions versions are centrally managed in `.github/action-versions.conf`
+- Use `make validate-actions` to check that all workflows use approved versions
+- Install git hooks with `make install-git-hooks` to automatically validate on commits
+- Update `.github/action-versions.conf` when approving new action versions
+- The validation script at `scripts/validate-actions.sh` enforces version consistency
+
 #### Branch Management & Cleanup
+
 - **Auto-prune setup**: Configure `git config --global fetch.prune true` for automatic cleanup
 - **Regular pruning**: Use `git remote prune origin` to remove stale remote references
 - **Local cleanup**: Delete merged branches with `git branch -d branch-name`

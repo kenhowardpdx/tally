@@ -425,8 +425,9 @@ Use `make github_workflow_terraform-pr` to test workflows locally before pushing
 - Future jobs should follow the pattern: `frontend-test`, `integration-test`, etc.
 
 **Before renaming any workflow job:**
+
 1. Check if it's configured as a required status check
-2. Update branch protection rules if necessary  
+2. Update branch protection rules if necessary
 3. Consider the impact on open PRs (they may need to be rebased)
 
 ## GitHub CLI and PR Management

@@ -7,7 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  # IMPORTANT: "backend-test" is a required status check for PRs
+  # Do not rename this job without updating branch protection rules
+  backend-test:
     runs-on: ubuntu-latest
     defaults:
       run:

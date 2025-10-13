@@ -397,6 +397,8 @@ logger.error("Error processing request", exc_info=True)
 - Runs on push/PR to main
 - Tests backend with Python 3.13 and Poetry
 - **~20 lines** - focused on essential testing
+- **CRITICAL**: Job name `backend-test` is a required status check for PRs
+- **Do not rename** the `backend-test` job without updating branch protection rules
 
 #### terraform-pr.yml
 
@@ -413,6 +415,19 @@ logger.error("Error processing request", exc_info=True)
 - **~60 lines** - production-ready deployment
 
 Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
+
+### Required Status Checks
+
+**Critical job names that must not be changed:**
+
+- **`backend-test`** (from ci.yml) - Required for all PRs to merge
+- Changing this job name will cause PRs to hang waiting for the old job name
+- Future jobs should follow the pattern: `frontend-test`, `integration-test`, etc.
+
+**Before renaming any workflow job:**
+1. Check if it's configured as a required status check
+2. Update branch protection rules if necessary  
+3. Consider the impact on open PRs (they may need to be rebased)
 
 ## GitHub CLI and PR Management
 

@@ -44,6 +44,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - **Avoid merge commits**: When resolving conflicts, always use rebase (`git rebase origin/main`) instead of merge commits
 
 #### Pull Request Creation
+
 - **For complex PR descriptions**: Create `pr-body.md` file and use `gh pr create --body-file pr-body.md`
 - **For simple PRs**: Use inline `--body` with GitHub CLI
 - **Always clean up**: Remove `pr-body.md` after PR creation (it's temporary)
@@ -76,7 +77,9 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Run tests before pushing changes
 
 #### .secrets File Pattern
+
 Create a `.secrets` file in the project root for local development:
+
 ```bash
 # .secrets file (never commit - already in .gitignore)
 AWS_PROFILE=AdministratorAccess-123456789012
@@ -86,6 +89,7 @@ TF_VAR_aws_profile=AdministratorAccess-123456789012
 ```
 
 Source it in your shell:
+
 ```bash
 source .secrets
 make github_workflow_terraform-pr  # Now has access to AWS credentials
@@ -104,6 +108,7 @@ make github_workflow_terraform-pr  # Now has access to AWS credentials
 **🔒 CRITICAL: Never commit sensitive information to the repository.**
 
 #### Sensitive Data Protection
+
 - **Never commit secrets, API keys, tokens, or credentials** to any branch
 - **Never commit real AWS account IDs, ARNs, or resource identifiers**
 - **Never commit personal paths** (e.g., `/Users/username/`) - use generic placeholders
@@ -112,12 +117,14 @@ make github_workflow_terraform-pr  # Now has access to AWS credentials
 - **Use placeholder values** in documentation and examples (e.g., `123456789012` for AWS account IDs)
 
 #### Configuration Management
+
 - **Local Development**: Use `.secrets` file for sensitive configuration
 - **GitHub Actions**: Use repository secrets (`${{ secrets.SECRET_NAME }}`)
 - **Terraform**: Use variables and data sources, never hardcode sensitive values
 - **Documentation**: Always use placeholder values, never real credentials
 
 #### Code Examples - DO NOT DO:
+
 ```hcl
 # ❌ NEVER DO THIS
 bucket = "terraform-state-993450011441"  # Real account ID
@@ -125,6 +132,7 @@ profile = "AdministratorAccess-993450011441"  # Real account ID
 ```
 
 #### Code Examples - CORRECT:
+
 ```hcl
 # ✅ CORRECT - Use variables
 bucket = "terraform-state-${var.aws_account_id}"
@@ -135,13 +143,16 @@ bucket = "terraform-state-123456789012"  # Your AWS account ID
 ```
 
 #### Emergency Response
+
 If sensitive data is accidentally committed:
+
 1. **DO NOT** push the commit
 2. Use `git filter-repo` to clean history if already pushed
 3. Contact GitHub Support if data is in PR history
 4. Rotate any exposed credentials immediately
 
 #### Additional Security Practices
+
 - Follow AWS security best practices
 - Use least privilege principle for IAM roles
 - Validate all user inputs
@@ -277,19 +288,147 @@ logger.error("Error processing request", exc_info=True)
 
 ## GitHub Actions Workflows
 
-### CI Workflow
+### Workflow Design Principles
+
+**Keep workflows terse and maintainable**:
+
+- **Combine related steps** into single multi-command blocks using `run: |`
+- **Use concise job/step names** - prefer `apply` over `Apply Infrastructure Changes`
+- **Leverage bash shortcuts** - use `||` and `&&` for conditional logic instead of verbose if-statements
+- **Remove unnecessary echo statements** - only include essential user feedback
+- **Use inline conditionals** where possible instead of separate conditional steps
+
+#### Terse Workflow Patterns
+
+```yaml
+# ✅ GOOD - Terse and clear
+- name: Init & Plan
+  run: |
+    terraform init -input=false
+    terraform validate
+    terraform plan -out=tfplan
+    echo "has_changes=$([[ $? -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+# ❌ AVOID - Verbose with unnecessary separation
+- name: Terraform Initialize
+  run: |
+    echo "🔧 Initializing Terraform..."
+    terraform init -input=false
+    if [ $? -ne 0 ]; then
+      echo "❌ Terraform init failed!"
+      exit 1
+    fi
+    echo "✅ Terraform initialized successfully"
+
+- name: Terraform Validate Configuration
+  run: |
+    echo "🔍 Validating Terraform configuration..."
+    terraform validate
+    # ... more verbose error handling
+```
+
+#### Action Usage Best Practices
+
+- **Use action shortcuts**: `uses: actions/checkout@v5` instead of full step definitions
+- **Combine permissions**: Define minimal required permissions at job level
+- **Leverage defaults**: Use `defaults.run.working-directory` to avoid repetition
+- **Cache strategically**: Only cache when there's measurable benefit
+
+#### Workflow Optimization Techniques
+
+**Multi-command Steps**:
+
+```yaml
+# ✅ Combine validation steps
+- name: Validate
+  run: |
+    [ -n "$TF_VAR_environment" ] || { echo "Environment required"; exit 1; }
+    aws sts get-caller-identity >/dev/null
+    terraform fmt -check -recursive
+
+# ❌ Separate steps add overhead
+- name: Check Environment
+- name: Validate AWS
+- name: Check Formatting
+```
+
+**Bash Conditionals**:
+
+```yaml
+# ✅ Inline conditional logic
+- name: Apply
+  run: |
+    terraform apply -auto-approve tfplan
+    echo "Status: $([[ $? -eq 0 ]] && echo success || echo failed)"
+
+# ❌ Verbose if-statement blocks
+- name: Apply
+  run: |
+    terraform apply -auto-approve tfplan
+    if [ $? -eq 0 ]; then
+      echo "Success"
+    else
+      echo "Failed"
+    fi
+```
+
+**Conditional Step Execution**:
+
+```yaml
+# ✅ Use step conditions for major logic branches
+- name: Apply Changes
+  if: steps.plan.outputs.has_changes == 'true'
+
+- name: Skip (No Changes)
+  if: steps.plan.outputs.has_changes == 'false'
+```
+
+**Essential Output Only**:
+
+- Remove decorative emojis and verbose progress messages
+- Focus on actionable information and error details
+- Use structured output for debugging (exit codes, timestamps)
+- Prefer `2>/dev/null` to suppress unnecessary warnings
+
+### Current Workflows
+
+#### ci.yml
 
 - Runs on push/PR to main
-- Executes backend tests
-- Validates code formatting
+- Tests backend with Python 3.13 and Poetry
+- **~20 lines** - focused on essential testing
+- **CRITICAL**: Job name `backend-test` is a required status check for PRs
+- **Do not rename** the `backend-test` job without updating branch protection rules
 
-### Terraform PR Validation
+#### terraform-pr.yml
 
-- Runs on PRs affecting infra/ directory
-- Validates Terraform configuration
-- Checks formatting and runs terraform plan
+- Validates Terraform on PRs affecting `infra/`
+- Posts plan results as PR comments
+- Supports both GitHub Actions and local `act` testing
+- **~110 lines** - comprehensive validation with PR feedback
+
+#### terraform-apply.yml
+
+- Applies infrastructure changes on main branch pushes
+- Uses OIDC authentication with AWS
+- Includes concurrency controls and conditional execution
+- **~60 lines** - production-ready deployment
 
 Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
+
+### Required Status Checks
+
+**Critical job names that must not be changed:**
+
+- **`backend-test`** (from ci.yml) - Required for all PRs to merge
+- Changing this job name will cause PRs to hang waiting for the old job name
+- Future jobs should follow the pattern: `frontend-test`, `integration-test`, etc.
+
+**Before renaming any workflow job:**
+
+1. Check if it's configured as a required status check
+2. Update branch protection rules if necessary
+3. Consider the impact on open PRs (they may need to be rebased)
 
 ## GitHub CLI and PR Management
 
@@ -302,12 +441,10 @@ When working with pull requests, use the GitHub CLI in non-interactive mode to a
 TERM=dumb gh pr view <pr-number> --comments
 
 # Get specific review/comment data using the API
-# Replace 'owner' and 'repo' with your actual repository owner and name
-gh api repos/owner/repo/pulls/<pr-number>/comments
+gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments
 
-# Extract specific comment details with jq
-# Replace 'owner' and 'repo' with your actual repository owner and name
-gh api repos/owner/repo/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+# Extract specific comment details with jq for easy reading
+gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
 
 # List PRs for current branch
 gh pr list --head <branch-name>
@@ -320,14 +457,31 @@ gh pr status
 
 When Copilot provides review comments on PRs:
 
-1. Use the API approach above to get specific line-by-line feedback
-2. Address each comment systematically
-3. Common issues Copilot flags:
-   - Redundant code patterns
-   - Formatting inconsistencies
-   - Accidental test/debug code
-   - Security concerns
-   - Performance optimizations
+1. **Get specific line-by-line feedback** using the API command above
+2. **Address each comment systematically** with focused commits
+3. **Use conventional commit format** for review fixes (e.g., `fix: address copilot PR review feedback`)
+
+**Example workflow:**
+
+```bash
+# Get PR comments for review
+gh api repos/kenhowardpdx/tally/pulls/31/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+
+# Address significant issues and commit fixes
+git add .
+git commit -m "fix: address copilot PR review feedback"
+git push
+```
+
+**Common issues Copilot flags:**
+
+- Redundant code patterns
+- Formatting inconsistencies
+- Accidental test/debug code
+- Security concerns
+- Performance optimizations
+- Shell compatibility issues
+- Missing error handling
 
 ---
 

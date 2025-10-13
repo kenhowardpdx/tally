@@ -1,0 +1,76 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**"]
+
+concurrency:
+  group: terraform-apply-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ./infra
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: terraform-apply-${{ github.run_id }}
+          aws-region: us-west-2
+
+      - name: Validate
+        run: |
+          [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment is required. Please set TF_VAR_environment to the appropriate value (e.g., 'production')."; exit 1; }
+          aws sts get-caller-identity >/dev/null
+          terraform fmt -check -recursive
+        env:
+          TF_VAR_environment: production
+
+      - name: Init & Plan
+        id: plan
+        run: |
+          cat > backend.conf << EOF
+          bucket  = "terraform-state-${{ secrets.AWS_ACCOUNT_ID }}"
+          key     = "tally/prod/terraform.tfstate"
+          region  = "us-west-2"
+          encrypt = true
+          EOF
+          terraform init -input=false -backend-config=backend.conf
+          terraform validate
+          terraform plan -input=false -out=tfplan -detailed-exitcode
+          plan_exit_code=$?
+          echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+        env:
+          TF_VAR_environment: production
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Apply
+        if: steps.plan.outputs.has_changes == 'true'
+        run: terraform apply -auto-approve -input=false tfplan
+        env:
+          TF_VAR_environment: production
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Output
+        if: success()
+        run: |
+          if [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
+            echo "✅ Applied $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            terraform output 2>/dev/null || echo "No outputs"
+          else
+            echo "✅ No changes needed"
+          fi
+
+      - name: Cleanup
+        if: failure()
+        run: rm -f tfplan

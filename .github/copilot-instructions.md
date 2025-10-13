@@ -530,26 +530,29 @@ Use `make github_workflow_terraform-pr` to test workflows locally before pushing
 
 ### Accessing PR Comments and Reviews
 
-When working with pull requests, use the GitHub CLI in non-interactive mode to access comments and reviews:
+**CRITICAL: Never use interactive GitHub CLI commands in automation or when programmatic access is needed.**
 
-```bash
-# View PR details without interactive prompts
-TERM=dumb gh pr view <pr-number> --comments
+Use curl with GitHub API for reliable, non-interactive access:
 
-# Get specific review/comment data using the API
-gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments
+````bash
+# ✅ CORRECT - Use curl for PR comments
+curl -s -H "Authorization: token $(gh auth token)" \
+  "https://api.github.com/repos/kenhowardpdx/tally/pulls/<pr-number>/comments" | \
+  jq -r '.[] | "\(.path):\(.line) - \(.body)"'
 
-# Extract specific comment details with jq for easy reading
-gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+# ✅ CORRECT - Use curl for PR reviews
+curl -s -H "Authorization: token $(gh auth token)" \
+  "https://api.github.com/repos/kenhowardpdx/tally/pulls/<pr-number>/reviews"
 
-# List PRs for current branch
+# ❌ AVOID - Interactive commands that hang in automation
+gh pr view <pr-number> --comments  # Opens interactive pager
+gh pr view <pr-number>              # Opens interactive interface
+
+# ✅ CORRECT - Non-interactive GitHub CLI usage
 gh pr list --head <branch-name>
-
-# Get PR status information
 gh pr status
-```
-
-### Copilot Review Comments
+gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments
+```### Copilot Review Comments
 
 When Copilot provides review comments on PRs:
 
@@ -567,7 +570,7 @@ gh api repos/kenhowardpdx/tally/pulls/31/comments | jq -r '.[] | "\(.path):\(.li
 git add .
 git commit -m "fix: address copilot PR review feedback"
 git push
-```
+````
 
 **Common issues Copilot flags:**
 

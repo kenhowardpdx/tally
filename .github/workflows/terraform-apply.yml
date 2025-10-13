@@ -2,189 +2,67 @@ name: Terraform Apply
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'infra/**/*.tf'
-      - 'infra/**/*.tfvars'
-      - 'infra/**/*.hcl'
+    branches: [main]
+    paths: ["infra/**"]
 
-# Prevent multiple terraform applies from running simultaneously
 concurrency:
   group: terraform-apply-production
   cancel-in-progress: false
 
 jobs:
-  terraform-apply:
-    name: Apply Infrastructure Changes
+  apply:
     runs-on: ubuntu-latest
-    
-    # Minimal required permissions for security
     permissions:
       contents: read
-      id-token: write  # Required for OIDC
-    
+      id-token: write
     defaults:
       run:
         working-directory: ./infra
     
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: latest
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: terraform-apply-${{ github.run_id }}
           aws-region: us-west-2
       
-      - name: Validate Environment and Backend Configuration
+      - name: Validate
         run: |
-          echo "🔍 Validating environment and configuration..."
-          
-          # Validate required environment variables
-          echo "📋 Checking required environment variables..."
-          if [ -z "$TF_VAR_environment" ]; then
-            echo "❌ TF_VAR_environment is not set"
-            exit 1
-          fi
-          echo "✅ Environment: $TF_VAR_environment"
-          
-          # Validate AWS credentials are configured
-          echo "🔐 Validating AWS credentials..."
-          aws sts get-caller-identity > /dev/null
-          if [ $? -ne 0 ]; then
-            echo "❌ AWS credentials not properly configured"
-            exit 1
-          fi
-          echo "✅ AWS credentials validated"
-          
-          # Check backend configuration
-          echo "🗄️ Checking backend configuration..."
-          if [ -f backend.conf.example ]; then
-            if [ ! -f backend.conf ]; then
-              echo "❌ backend.conf not found. Please create it from backend.conf.example"
-              exit 1
-            fi
-            echo "✅ Backend configuration found"
-          fi
-          
-          # Validate Terraform files syntax
-          echo "📝 Checking Terraform syntax..."
+          [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment required"; exit 1; }
+          aws sts get-caller-identity >/dev/null
+          [ ! -f backend.conf.example ] || [ -f backend.conf ] || { echo "backend.conf required"; exit 1; }
           terraform fmt -check -recursive
-          if [ $? -ne 0 ]; then
-            echo "⚠️ Terraform files are not properly formatted"
-            echo "💡 Run 'terraform fmt -recursive' to fix formatting"
-          else
-            echo "✅ Terraform files are properly formatted"
-          fi
         env:
           TF_VAR_environment: production
       
-      - name: Terraform Init
-        run: |
-          echo "🔧 Initializing Terraform..."
-          terraform init -input=false
-          if [ $? -ne 0 ]; then
-            echo "❌ Terraform init failed!"
-            exit 1
-          fi
-          echo "✅ Terraform initialized successfully"
-      
-      - name: Terraform Validate
-        run: |
-          echo "🔍 Validating Terraform configuration..."
-          terraform validate
-          if [ $? -ne 0 ]; then
-            echo "❌ Terraform validation failed!"
-            exit 1
-          fi
-          echo "✅ Terraform configuration is valid"
-      
-      - name: Terraform Plan
+      - name: Init & Plan
         id: plan
         run: |
-          echo "📋 Creating Terraform execution plan..."
+          terraform init -input=false
+          terraform validate
           terraform plan -input=false -out=tfplan -detailed-exitcode
-          PLAN_EXIT_CODE=$?
-          
-          if [ $PLAN_EXIT_CODE -eq 1 ]; then
-            echo "❌ Terraform plan failed!"
-            exit 1
-          elif [ $PLAN_EXIT_CODE -eq 2 ]; then
-            echo "📝 Changes detected in plan"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "✅ No changes detected"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
+          echo "has_changes=$([[ $? -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
         env:
           TF_VAR_environment: production
       
-      - name: Terraform Apply
+      - name: Apply
         if: steps.plan.outputs.has_changes == 'true'
-        run: |
-          echo "🚀 Applying Terraform changes..."
-          terraform apply -auto-approve -input=false tfplan
-          if [ $? -ne 0 ]; then
-            echo "❌ Terraform apply failed!"
-            echo "🧹 Cleaning up temporary files..."
-            rm -f tfplan
-            exit 1
-          fi
-          echo "✅ Terraform apply completed successfully!"
+        run: terraform apply -auto-approve -input=false tfplan
         env:
           TF_VAR_environment: production
       
-      - name: Skip Apply (No Changes)
-        if: steps.plan.outputs.has_changes == 'false'
+      - name: Output
+        if: success()
         run: |
-          echo "ℹ️ No infrastructure changes detected, skipping apply"
-          echo "🎯 Current infrastructure is already up to date"
-      
-      - name: Display Infrastructure Summary
-        if: success() && steps.plan.outputs.has_changes == 'true'
-        run: |
-          echo "🎉 Infrastructure deployment completed successfully!"
-          echo ""
-          echo "📊 Deployment Summary:"
-          echo "├── Environment: production"
-          echo "├── Region: us-west-2"
-          echo "├── Terraform Version: $(terraform version -json | jq -r '.terraform_version')"
-          echo "└── Applied at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo ""
-          
-          # Display outputs if any exist
-          if terraform output > /dev/null 2>&1; then
-            echo "📋 Infrastructure Outputs:"
-            terraform output -json | jq -r 'to_entries[] | "├── \(.key): \(.value.value)"'
+          if [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
+            echo "✅ Applied $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            terraform output 2>/dev/null || echo "No outputs"
           else
-            echo "📋 No outputs defined"
+            echo "✅ No changes needed"
           fi
-          echo ""
-          
-          # Display resource count
-          echo "🏗️ Infrastructure Resources:"
-          terraform show -json | jq -r '.values.root_module.resources | length' | xargs -I {} echo "├── Total resources: {}"
-          echo "└── State file: $(terraform show -json | jq -r '.terraform_version // "unknown"')"
       
-      - name: Display Success Message (No Changes)
-        if: success() && steps.plan.outputs.has_changes == 'false'
-        run: |
-          echo "✨ Infrastructure verification completed!"
-          echo "🎯 No changes were needed - infrastructure is up to date"
-          echo "📊 Current state matches desired configuration"
-      
-      - name: Cleanup on Failure
+      - name: Cleanup
         if: failure()
-        run: |
-          echo "❌ Terraform apply failed!"
-          echo "🧹 Cleaning up temporary files..."
-          rm -f tfplan
-          echo "💡 Check the logs above for detailed error information"
+        run: rm -f tfplan

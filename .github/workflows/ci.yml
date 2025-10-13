@@ -7,28 +7,19 @@ on:
     branches: [main]
 
 jobs:
-  backend-test:
-    name: Backend Tests
+  test:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ./backend
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
-      - name: Install backend dependencies
+      - name: Test
         run: |
-          python -m pip install --upgrade pip
           pip install poetry
           poetry install --all-extras
-
-      - name: Run backend tests
-        run: poetry run pytest
+          poetry run pytest

@@ -25,7 +25,7 @@ provider "aws" {
 module "vpc" {
   source = "./modules/vpc"
 
-  vpc_cidr                  = "10.0.0.0/16"
+  vpc_cidr                  = "10.0.0.0/20"
   environment               = var.environment
   project_name              = "tally"
   availability_zones        = ["${var.aws_region}a", "${var.aws_region}b"]

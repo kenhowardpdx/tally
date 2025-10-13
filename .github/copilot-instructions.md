@@ -425,12 +425,10 @@ When working with pull requests, use the GitHub CLI in non-interactive mode to a
 TERM=dumb gh pr view <pr-number> --comments
 
 # Get specific review/comment data using the API
-# Replace 'owner' and 'repo' with your actual repository owner and name
-gh api repos/owner/repo/pulls/<pr-number>/comments
+gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments
 
-# Extract specific comment details with jq
-# Replace 'owner' and 'repo' with your actual repository owner and name
-gh api repos/owner/repo/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+# Extract specific comment details with jq for easy reading
+gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
 
 # List PRs for current branch
 gh pr list --head <branch-name>
@@ -443,14 +441,29 @@ gh pr status
 
 When Copilot provides review comments on PRs:
 
-1. Use the API approach above to get specific line-by-line feedback
-2. Address each comment systematically
-3. Common issues Copilot flags:
-   - Redundant code patterns
-   - Formatting inconsistencies
-   - Accidental test/debug code
-   - Security concerns
-   - Performance optimizations
+1. **Get specific line-by-line feedback** using the API command above
+2. **Address each comment systematically** with focused commits  
+3. **Use conventional commit format** for review fixes (e.g., `fix: address copilot PR review feedback`)
+
+**Example workflow:**
+```bash
+# Get PR comments for review
+gh api repos/kenhowardpdx/tally/pulls/31/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+
+# Address significant issues and commit fixes
+git add .
+git commit -m "fix: address copilot PR review feedback"
+git push
+```
+
+**Common issues Copilot flags:**
+- Redundant code patterns
+- Formatting inconsistencies  
+- Accidental test/debug code
+- Security concerns
+- Performance optimizations
+- Shell compatibility issues
+- Missing error handling
 
 ---
 

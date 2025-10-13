@@ -19,7 +19,41 @@ variable "aws_profile" {
   # GitHub Actions: Uses OIDC, so this is ignored
 }
 
-# Outputs for modules - commented out until modules are implemented
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "prod"
+  # Set via environment variable TF_VAR_environment
+  # GitHub Actions: Uses workflow inputs or defaults to production
+}
+
+# VPC Module Outputs
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = module.vpc.vpc_id
+}
+
+output "private_subnet_ids" {
+  description = "List of IDs of private subnets"
+  value       = module.vpc.private_subnets
+}
+
+output "public_subnet_ids" {
+  description = "List of IDs of public subnets"
+  value       = module.vpc.public_subnets
+}
+
+output "lambda_security_group_id" {
+  description = "ID of the Lambda security group"
+  value       = module.vpc.lambda_security_group_id
+}
+
+output "rds_security_group_id" {
+  description = "ID of the RDS security group"
+  value       = module.vpc.rds_security_group_id
+}
+
+# Placeholder outputs - commented out until modules are implemented
 
 # output "lambda_function_arn" {
 #   value = module.lambda.lambda_function_arn

@@ -21,12 +21,26 @@ provider "aws" {
   # The setup-aws.sh script exports credentials to environment variables
 }
 
+# VPC Module - Network Foundation
+module "vpc" {
+  source = "./modules/vpc"
+
+  vpc_cidr                  = "10.0.0.0/16"
+  environment               = var.environment
+  project_name              = "tally"
+  availability_zones        = ["${var.aws_region}a", "${var.aws_region}b"]
+  enable_nat_gateway        = true
+  enable_single_nat_gateway = true # Cost optimization - single NAT Gateway
+}
+
 # Placeholder modules - commented out until implementation
 # Uncomment and configure these modules as you implement each component
 
 # module "lambda" {
 #   source = "./modules/lambda"
-#   # Add lambda module variables here
+#   vpc_id                  = module.vpc.vpc_id
+#   private_subnet_ids      = module.vpc.private_subnets
+#   lambda_security_group_id = module.vpc.lambda_security_group_id
 # }
 
 # module "api_gateway" {

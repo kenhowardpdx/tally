@@ -33,6 +33,14 @@ Tally is a financial application for managing recurring bills and forecasting ba
 - Include comprehensive resource tagging
 - Use data sources for existing resources when possible
 
+### File Formatting
+
+- **Always end files with a single empty line** - This is a POSIX standard and helps with clean diffs
+- Use consistent indentation (2 spaces for YAML/HCL, 4 spaces for Python)
+- Remove trailing whitespace
+- Use Unix line endings (LF)
+- Keep line lengths reasonable (80-120 characters)
+
 ### Git Workflow
 
 - Use conventional commits format (feat:, fix:, docs:, etc.)

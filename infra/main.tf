@@ -60,12 +60,12 @@ module "rds" {
 }
 
 module "bastion" {
-  source             = "./modules/bastion"
-  ami_id             = "ami-0c94855ba95c71c99" # Amazon Linux 2 (us-west-2)
-  subnet_id          = module.vpc.public_subnet_ids[0]
-  security_group_id  = module.vpc.lambda_security_group_id
-  key_name           = "your-ssh-key-name" # Replace with your actual key name
-  tags               = {
+  source            = "./modules/bastion"
+  ami_id            = "ami-0c94855ba95c71c99" # Amazon Linux 2 (us-west-2)
+  subnet_id         = module.vpc.public_subnet_ids[0]
+  security_group_id = module.vpc.lambda_security_group_id
+  key_name          = "tally-bastion-key-prod" # Project-specific SSH key name
+  tags = {
     Environment = var.environment
     Project     = "tally"
     Purpose     = "bastion"

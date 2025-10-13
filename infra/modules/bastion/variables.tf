@@ -14,8 +14,9 @@ variable "security_group_id" {
 }
 
 variable "key_name" {
-  description = "SSH key name for bastion host access"
+  description = "SSH key name for bastion host"
   type        = string
+  default     = "tally-bastion-key-prod"
 }
 
 variable "tags" {

@@ -290,6 +290,41 @@ logger.error("Error processing request", exc_info=True)
 
 Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
 
+## GitHub CLI and PR Management
+
+### Accessing PR Comments and Reviews
+
+When working with pull requests, use the GitHub CLI in non-interactive mode to access comments and reviews:
+
+```bash
+# View PR details without interactive prompts
+TERM=dumb gh pr view <pr-number> --comments
+
+# Get specific review/comment data using the API
+gh api repos/owner/repo/pulls/<pr-number>/comments
+
+# Extract specific comment details with jq
+gh api repos/owner/repo/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+
+# List PRs for current branch
+gh pr list --head <branch-name>
+
+# Get PR status information
+gh pr status
+```
+
+### Copilot Review Comments
+
+When Copilot provides review comments on PRs:
+1. Use the API approach above to get specific line-by-line feedback
+2. Address each comment systematically
+3. Common issues Copilot flags:
+   - Redundant code patterns
+   - Formatting inconsistencies  
+   - Accidental test/debug code
+   - Security concerns
+   - Performance optimizations
+
 ---
 
 When suggesting code or infrastructure changes, please follow these guidelines and patterns to maintain consistency across the project.

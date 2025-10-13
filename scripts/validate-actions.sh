@@ -112,7 +112,7 @@ check_consistency() {
         version_count=$(echo "$versions" | wc -l | tr -d ' ')
         
         if [[ $version_count -gt 1 ]]; then
-            print_error "❌ Action '$action' has inconsistent versions:"
+            print_error "Action '$action' has inconsistent versions:"
             while IFS= read -r version; do
                 if [[ -n "$version" ]]; then
                     local files

@@ -120,6 +120,19 @@ resource "aws_security_group" "lambda" {
   }
 }
 
+# RDS Subnet Group (for use by RDS instance)
+resource "aws_db_subnet_group" "rds" {
+  name       = "tally-db-subnet-group"
+  subnet_ids = aws_subnet.database[*].id
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "rds"
+  }
+  description = "Database subnet group for RDS"
+}
+
 # RDS Security Group
 resource "aws_security_group" "rds" {
   name_prefix = "${var.project_name}-${var.environment}-rds-"

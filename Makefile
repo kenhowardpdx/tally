@@ -30,6 +30,18 @@ help: ## Show this help message
 github_workflow_terraform-pr: ## Run the Terraform PR validation workflow
 	@$(MAKE) .github_workflow_terraform-pr
 
+github_workflow_terraform-apply: ## Run the Terraform Apply workflow
+	@if [ -z "$$AWS_PROFILE" ] && ! grep -q "^AWS_PROFILE=" .secrets 2>/dev/null; then \
+		echo "Error: AWS_PROFILE not found. Add to .secrets or environment."; \
+		exit 1; \
+	fi
+	act push \
+		--secret-file .secrets \
+		--container-options "-v $(HOME)/.aws:/root/.aws:ro" \
+		--env AWS_DEFAULT_REGION=us-west-2 \
+		--env ACT=true \
+		-W .github/workflows/terraform-apply.yml
+
 github_workflow_ci: ## Run the CI workflow
 	@$(MAKE) .github_workflow_ci
 

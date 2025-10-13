@@ -3,7 +3,7 @@
 resource "aws_db_instance" "main" {
   allocated_storage       = 20 # Free tier limit
   engine                  = "postgres"
-  engine_version          = "15.5"        # Latest supported free tier version
+  engine_version          = "15.3"        # Latest supported free tier version
   instance_class          = "db.t3.micro" # Free tier eligible
   db_name                 = var.db_name
   username                = var.db_username

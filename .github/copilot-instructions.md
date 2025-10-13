@@ -552,7 +552,9 @@ gh pr view <pr-number>              # Opens interactive interface
 gh pr list --head <branch-name>
 gh pr status
 gh api repos/kenhowardpdx/tally/pulls/<pr-number>/comments
-```### Copilot Review Comments
+```
+
+### Copilot Review Comments
 
 When Copilot provides review comments on PRs:
 
@@ -564,13 +566,15 @@ When Copilot provides review comments on PRs:
 
 ```bash
 # Get PR comments for review
-gh api repos/kenhowardpdx/tally/pulls/31/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
+curl -s -H "Authorization: token $(gh auth token)" \
+  "https://api.github.com/repos/kenhowardpdx/tally/pulls/<pr-number>/comments" | \
+  jq -r '.[] | "\(.path):\(.line) - \(.body)"'
 
 # Address significant issues and commit fixes
 git add .
 git commit -m "fix: address copilot PR review feedback"
 git push
-````
+```
 
 **Common issues Copilot flags:**
 

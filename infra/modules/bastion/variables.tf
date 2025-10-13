@@ -1,7 +1,3 @@
-variable "ami_id" {
-  description = "AMI ID for bastion host (use latest Amazon Linux 2)"
-  type        = string
-}
 
 variable "subnet_id" {
   description = "Public subnet ID for bastion host"

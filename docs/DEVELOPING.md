@@ -1,4 +1,3 @@
-
 # Development Guide
 
 This guide helps you set up Tally for local development, workflow testing, and infrastructure management.
@@ -167,7 +166,6 @@ Create a `.actrc` file in the project root:
 # Or use smaller images for faster execution (may have compatibility issues)
 # -P ubuntu-latest=catthehacker/ubuntu:act-latest-micro
 ```
-
 
 #### AWS Credentials Setup
 

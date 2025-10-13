@@ -1,9 +1,9 @@
-
 # Tally
 
 Tally is a financial application for managing recurring bills and forecasting bank account balances.
 
 ## Tech Stack
+
 - Backend: Python (FastAPI)
 - Infrastructure: Terraform (AWS)
 - CI/CD: GitHub Actions, tested locally with [act](https://github.com/nektos/act)

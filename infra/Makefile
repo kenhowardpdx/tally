@@ -15,16 +15,16 @@ init: aws-setup ## Initialize Terraform with remote backend
 	 source .aws-credentials && terraform init -backend-config=backend.conf
 
 plan: aws-setup ## Create and show Terraform execution plan
-	@([ -f "../.secrets" ] && set -a && source ../.secrets && set +a) || true; \
+	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform plan
 
 show: aws-setup ## Show current Terraform state
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a; \
+	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform show
 
 apply: aws-setup ## Apply Terraform configuration
 	@read -p "Apply changes? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a; \
+	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform apply
 
 validate: ## Validate Terraform configuration
@@ -32,7 +32,7 @@ validate: ## Validate Terraform configuration
 
 destroy: aws-setup ## Destroy Terraform-managed infrastructure
 	@read -p "⚠️  DESTROY all resources? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a; \
+	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 source .aws-credentials && terraform destroy
 
 fmt: ## Format Terraform files

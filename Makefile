@@ -46,8 +46,9 @@ validate-actions: ## Validate GitHub Actions versions against approved list
 	@./scripts/validate-actions.sh
 
 show-action-versions: ## Display all approved GitHub Actions versions
-	@grep -v "^#" .github/action-versions.conf | grep -v "^$$" | while IFS=':' read -r action version; do \
-		printf "%-40s %s\n" "$$action" "$$version"; \
+	@maxlen=$$(grep -v "^#" .github/action-versions.conf | grep -v "^$$" | awk -F':' '{print length($$1)}' | sort -nr | head -n1); \
+	grep -v "^#" .github/action-versions.conf | grep -v "^$$" | while IFS=':' read -r action version; do \
+		printf "%-$${maxlen}s %s\n" "$$action" "$$version"; \
 	done
 
 show-current-usage: ## Show which action versions are currently used in workflows

@@ -17,7 +17,7 @@ WORKFLOWS_DIR=".github/workflows"
 
 # Global tracking files for action usage
 TEMP_ACTIONS_FILE=$(mktemp)
-TEMP_FILE="/tmp/approved-versions-$$"
+TEMP_FILE=$(mktemp)
 
 print_header() {
     echo -e "${BLUE}🔍 GitHub Actions Version Validator${NC}"
@@ -109,7 +109,7 @@ check_consistency() {
         local versions
         versions=$(grep "^$action|" "$TEMP_ACTIONS_FILE" | cut -d'|' -f2 | sort -u)
         local version_count
-        version_count=$(echo "$versions" | wc -l | tr -d ' ')
+        version_count=$(echo "$versions" | grep -c .)
         
         if [[ $version_count -gt 1 ]]; then
             print_error "Action '$action' has inconsistent versions:"
@@ -140,8 +140,8 @@ validate_workflow_file() {
             local version="${BASH_REMATCH[2]}"
             
             # Clean up any quotes
-            action=$(echo "$action" | tr -d '"'"'"'')
-            version=$(echo "$version" | tr -d '"'"'"'')
+            action="${action//[\"\']}"
+            version="${version//[\"\']}"
             
             # Track all action usage for consistency checking
             track_action_usage "$action" "$version" "$workflow_file"

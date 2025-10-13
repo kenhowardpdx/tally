@@ -1,163 +1,41 @@
-# Tally
+![act-logo](https://raw.githubusercontent.com/wiki/nektos/act/img/logo-150.png)
 
-Tally is an application designed to help you manage recurring bills and forecast your future bank account balance. With Tally, you can track upcoming payments, visualize your cash flow, and plan ahead with confidence.
+# Overview [![push](https://github.com/nektos/act/workflows/push/badge.svg?branch=master&event=push)](https://github.com/nektos/act/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/nektos/act)](https://goreportcard.com/report/github.com/nektos/act) [![awesome-runners](https://img.shields.io/badge/listed%20on-awesome--runners-blue.svg)](https://github.com/jonico/awesome-runners)
 
-## Architecture
+> "Think globally, `act` locally"
 
-Tally is built with a modern, cloud-native architecture:
+Run your [GitHub Actions](https://developer.github.com/actions/) locally! Why would you want to do this? Two reasons:
 
-- **Frontend**: Svelte application served via AWS CloudFront and S3
-- **Backend**: Python FastAPI application running on AWS Lambda
-- **Database**: PostgreSQL on AWS RDS
-- **Authentication**: Auth0 integration
-- **Infrastructure**: Managed with Terraform and AWS
+- **Fast Feedback** - Rather than having to commit/push every time you want to test out the changes you are making to your `.github/workflows/` files (or for any changes to embedded GitHub actions), you can use `act` to run the actions locally. The [environment variables](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables#default-environment-variables) and [filesystem](https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners#filesystems-on-github-hosted-runners) are all configured to match what GitHub provides.
+- **Local Task Runner** - I love [make](<https://en.wikipedia.org/wiki/Make_(software)>). However, I also hate repeating myself. With `act`, you can use the GitHub Actions defined in your `.github/workflows/` to replace your `Makefile`!
 
-## Development Options
+> [!TIP]
+> **Now Manage and Run Act Directly From VS Code!**<br/>
+> Check out the [GitHub Local Actions](https://sanjulaganepola.github.io/github-local-actions-docs/) Visual Studio Code extension which allows you to leverage the power of `act` to run and test workflows locally without leaving your editor.
 
-### Option 1: Local Development with Docker Compose
+# How Does It Work?
 
-For local development and testing:
+When you run `act` it reads in your GitHub Actions from `.github/workflows/` and determines the set of actions that need to be run. It uses the Docker API to either pull or build the necessary images, as defined in your workflow files and finally determines the execution path based on the dependencies that were defined. Once it has the execution path, it then uses the Docker API to run containers for each action based on the images prepared earlier. The [environment variables](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables#default-environment-variables) and [filesystem](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#file-systems) are all configured to match what GitHub provides.
 
-## Getting Started with Docker Compose
+Let's see it in action with a [sample repo](https://github.com/cplee/github-actions-demo)!
 
-Tally uses Docker Compose to simplify running all required services. Follow the steps below to get started:
+![Demo](https://raw.githubusercontent.com/wiki/nektos/act/quickstart/act-quickstart-2.gif)
 
-### Prerequisites
+# Act User Guide
 
-- [Docker](https://docs.docker.com/get-docker/) installed
-- [Docker Compose](https://docs.docker.com/compose/install/) installed
+Please look at the [act user guide](https://nektosact.com) for more documentation.
 
-### Starting the Services
+# Support
 
-Start the services with:
+Need help? Ask in [discussions](https://github.com/nektos/act/discussions)!
 
-```sh
-docker-compose up
-```
+# Contributing
 
-This command will build and start all necessary containers for Tally.
+Want to contribute to act? Awesome! Check out the [contributing guidelines](CONTRIBUTING.md) to get involved.
 
-Access the application by opening your browser and navigating to [http://localhost:8000](http://localhost:8000) (or the port specified in your `docker-compose.yml`).
+## Manually building from source
 
-### Stopping the Services
-
-To stop the services, press `Ctrl+C` in the terminal where Docker Compose is running, then run:
-
-```sh
-docker-compose down
-```
-
-## Configuration
-
-You can customize environment variables and service settings in the `docker-compose.yml` file as needed.
-
-### Option 2: AWS Cloud Infrastructure
-
-For production deployment and cloud development:
-
-#### Prerequisites
-
-- AWS CLI with SSO configured
-- Terraform >= 1.0.0
-- Access to AWS account with appropriate permissions
-
-#### Quick Start
-
-```sh
-# Navigate to infrastructure directory
-cd infra
-
-# Set up AWS credentials and initialize Terraform
-make dev-setup
-
-# Plan infrastructure changes
-make plan
-
-# Deploy infrastructure
-make apply
-```
-
-For detailed infrastructure setup, deployment guides, and architecture documentation, see the [Infrastructure README](infra/README.md).
-
-## Project Structure
-
-```
-├── backend/          # Python FastAPI backend
-├── frontend/         # Svelte frontend application
-├── infra/           # Terraform infrastructure as code
-│   ├── modules/     # Reusable Terraform modules
-│   ├── Makefile     # Infrastructure automation commands
-│   └── README.md    # Detailed infrastructure documentation
-└── scripts/         # Deployment and utility scripts
-```
-
-## Local GitHub Actions Testing
-
-Tally includes support for testing GitHub Actions workflows locally using [Act](https://github.com/nektos/act). This allows you to validate workflows before pushing changes.
-
-### Quick Setup
-
-1. **Install Act**:
-
-   ```sh
-   # macOS
-   brew install act
-
-   # Or download from: https://github.com/nektos/act/releases
-   ```
-
-2. **Configure Secrets**:
-
-   ```sh
-   # Copy the example secrets file
-   cp .secrets.example .secrets
-
-   # Edit .secrets with your actual values
-   # AWS_PROFILE: Your AWS profile name from ~/.aws/config
-   # AWS_ROLE_ARN: Your GitHub Actions role ARN
-   # TF_VAR_aws_account_id: Your AWS account ID (for Terraform)
-   # TF_VAR_aws_profile: Your AWS profile (for local Terraform)
-   ```
-
-3. **Test Workflows**:
-
-   ```sh
-   # The Makefile will automatically use AWS_PROFILE from .secrets
-   # List available workflow targets
-   make help
-
-   # Test Terraform PR validation
-   make github_workflow_terraform-pr
-
-   # Test CI workflow
-   make github_workflow_ci
-   ```
-
-### Secrets Configuration
-
-The `.secrets` file contains **required** configuration for local development:
-
-- **AWS_PROFILE**: Your AWS SSO profile name (e.g., `AdministratorAccess-123456789012`) - **Required**
-- **AWS_ROLE_ARN**: The IAM role ARN that GitHub Actions uses (e.g., `arn:aws:iam::123456789012:role/tally-github-actions-role`)
-- **TF_VAR_aws_account_id**: Your AWS account ID for Terraform backend configuration - **Required**
-- **TF_VAR_aws_profile**: Your AWS profile for local Terraform operations - **Required**
-
-**GitHub Actions**: Uses repository secrets (`AWS_ACCOUNT_ID`, `AWS_ROLE_ARN`) instead of the `.secrets` file.
-
-**Important**:
-
-- The `.secrets` file is included in `.gitignore` and should never be committed to version control
-- Required variables must be set - commands will fail with clear error messages if missing
-
-## Development Workflow
-
-1. **Local Development**: Use Docker Compose for rapid development and testing
-2. **Infrastructure**: Use Terraform with the provided Makefile for AWS deployment
-3. **CI/CD**: GitHub Actions workflows for automated testing and deployment
-4. **Local Testing**: Use Act with our Makefile targets to test workflows locally
-
-For detailed development practices, local testing with GitHub Actions, and debugging guides, see the [Development Guide](docs/DEVELOPING.md).
-
-## Support
-
-For questions or issues, please open an issue on the [GitHub repository](https://github.com/kenhowardpdx/tally/issues).
+- Install Go tools 1.20+ - (<https://golang.org/doc/install>)
+- Clone this repo `git clone git@github.com:nektos/act.git`
+- Run unit tests with `make test`
+- Build and install: `make install`

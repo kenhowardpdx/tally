@@ -16,7 +16,6 @@ jobs:
     defaults:
       run:
         working-directory: ./infra
-
     steps:
       - uses: actions/checkout@v5
       - uses: aws-actions/configure-aws-credentials@v4
@@ -28,27 +27,39 @@ jobs:
         with:
           terraform_wrapper: false
       - uses: actions/cache@v4
+        if: ${{ !env.ACT }}
         with:
           path: ./infra/.terraform
           key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}
 
-      - name: Init & Validate
+      - name: Init
         run: |
-          cat > backend.conf << EOF
-          bucket  = "terraform-state-${{ secrets.AWS_ACCOUNT_ID }}"
-          key     = "tally/prod/terraform.tfstate"
-          region  = "us-west-2"
-          encrypt = true
-          EOF
-          terraform init -backend-config=backend.conf
-          terraform fmt -check -recursive
-          terraform validate
+          if [ "$ACT" = "true" ]; then
+            echo 'Using local backend for ACT run.'
+            make init-local
+          else
+            cp .github/workflows/backend.conf.json backend.conf
+            terraform init -backend-config=backend.conf
+          fi
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Check Formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate
+        run: terraform validate
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Plan
         id: plan
         run: |
+          echo "Cleaning backend config for ACT/local run"
+          rm -f backend.conf
+          rm -f ../.github/workflows/backend.conf.json
+          echo "Running terraform init -reconfigure before plan"
+          terraform init -reconfigure
           terraform plan -no-color -out=tfplan 2>&1 | tee plan.txt
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
@@ -57,8 +68,8 @@ jobs:
         continue-on-error: true
 
       - name: Comment
-        uses: actions/github-script@v7
         if: github.event_name == 'pull_request' && !env.ACT
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');

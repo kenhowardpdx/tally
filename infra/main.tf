@@ -6,11 +6,7 @@ terraform {
       version = ">= 5.0"
     }
   }
-  backend "s3" {
-    # Backend configuration is provided via init command
-    # Local: make init (uses .secrets)
-    # GitHub Actions: uses repository secrets
-  }
+  # Backend configuration is now provided via workflow (see .github/workflows/terraform-pr.yml)
 }
 
 provider "aws" {

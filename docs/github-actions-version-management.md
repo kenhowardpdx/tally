@@ -106,8 +106,8 @@ git commit -m "update workflow"
 💡 To fix these issues:
    1. Update the workflow files to use approved versions
    2. Ensure consistent versions for the same actions across files
-   2. Or update .github/action-versions.conf if new versions are approved
-   3. Run 'make validate-actions' to re-check
+   3. Or update .github/action-versions.conf if new versions are approved
+   4. Run 'make validate-actions' to re-check
 ```
 
 ## Updating Approved Versions

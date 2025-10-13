@@ -320,7 +320,7 @@ logger.error("Error processing request", exc_info=True)
     fi
     echo "✅ Terraform initialized successfully"
 
-- name: Terraform Validate Configuration  
+- name: Terraform Validate Configuration
   run: |
     echo "🔍 Validating Terraform configuration..."
     terraform validate
@@ -337,6 +337,7 @@ logger.error("Error processing request", exc_info=True)
 #### Workflow Optimization Techniques
 
 **Multi-command Steps**:
+
 ```yaml
 # ✅ Combine validation steps
 - name: Validate
@@ -352,6 +353,7 @@ logger.error("Error processing request", exc_info=True)
 ```
 
 **Bash Conditionals**:
+
 ```yaml
 # ✅ Inline conditional logic
 - name: Apply
@@ -371,16 +373,18 @@ logger.error("Error processing request", exc_info=True)
 ```
 
 **Conditional Step Execution**:
+
 ```yaml
 # ✅ Use step conditions for major logic branches
 - name: Apply Changes
   if: steps.plan.outputs.has_changes == 'true'
-  
-- name: Skip (No Changes)  
+
+- name: Skip (No Changes)
   if: steps.plan.outputs.has_changes == 'false'
 ```
 
 **Essential Output Only**:
+
 - Remove decorative emojis and verbose progress messages
 - Focus on actionable information and error details
 - Use structured output for debugging (exit codes, timestamps)
@@ -389,17 +393,20 @@ logger.error("Error processing request", exc_info=True)
 ### Current Workflows
 
 #### ci.yml
+
 - Runs on push/PR to main
 - Tests backend with Python 3.13 and Poetry
 - **~20 lines** - focused on essential testing
 
-#### terraform-pr.yml  
+#### terraform-pr.yml
+
 - Validates Terraform on PRs affecting `infra/`
 - Posts plan results as PR comments
 - Supports both GitHub Actions and local `act` testing
 - **~110 lines** - comprehensive validation with PR feedback
 
 #### terraform-apply.yml
+
 - Applies infrastructure changes on main branch pushes
 - Uses OIDC authentication with AWS
 - Includes concurrency controls and conditional execution

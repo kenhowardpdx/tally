@@ -101,7 +101,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 ### Local Development
 
-- Use Docker Compose for local development environment  
+- Use Docker Compose for local development environment
 - **Use `.secrets` file** for local sensitive configuration (never commit this file)
 - Test GitHub Actions locally using `act` (use Makefile targets like `make github_workflow_terraform-pr`)
 - Validate Terraform changes locally before committing
@@ -226,7 +226,7 @@ resource "aws_security_group" "lambda" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 

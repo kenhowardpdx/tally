@@ -29,7 +29,7 @@ module "vpc" {
   environment        = var.environment
   project_name       = "tally"
   availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
-  
+
   # NAT Gateway disabled for zero-cost architecture
   # Lambda functions will run in public subnets with security groups
 }

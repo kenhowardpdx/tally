@@ -11,11 +11,11 @@ aws-setup: ## Configure AWS SSO credentials
 init: aws-setup ## Initialize Terraform with remote backend
 	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
 	@set -a && source ../.secrets && set +a && \
-	 echo "bucket=\"terraform-state-$$TF_VAR_aws_account_id\"\nkey=\"tally/prod/terraform.tfstate\"\nregion=\"us-west-2\"\nencrypt=true" > backend.conf && \
+	 printf "bucket=\"terraform-state-$$TF_VAR_aws_account_id\"\nkey=\"tally/prod/terraform.tfstate\"\nregion=\"us-west-2\"\nencrypt=true\n" > backend.conf && \
 	 source .aws-credentials && terraform init -backend-config=backend.conf
 
 plan: aws-setup ## Create and show Terraform execution plan
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a; \
+	@([ -f "../.secrets" ] && set -a && source ../.secrets && set +a) || true; \
 	 source .aws-credentials && terraform plan
 
 show: aws-setup ## Show current Terraform state

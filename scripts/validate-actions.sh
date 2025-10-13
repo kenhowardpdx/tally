@@ -115,8 +115,15 @@ check_consistency() {
             print_error "Action '$action' has inconsistent versions:"
             while IFS= read -r version; do
                 if [[ -n "$version" ]]; then
+                    # Collect file names into an array and join with commas
+                    local files_arr=()
+                    while IFS='|' read -r a v f; do
+                        if [[ "$a" == "$action" && "$v" == "$version" ]]; then
+                            files_arr+=("$f")
+                        fi
+                    done < "$TEMP_ACTIONS_FILE"
                     local files
-                    files=$(grep "^$action|$version|" "$TEMP_ACTIONS_FILE" | cut -d'|' -f3 | tr '\n' ',' | sed 's/,$//')
+                    files=$(IFS=,; echo "${files_arr[*]}")
                     print_error "   Version $version used in: $files"
                 fi
             done <<< "$versions"
@@ -135,7 +142,7 @@ validate_workflow_file() {
     
     # Find all 'uses:' statements with regex
     while IFS= read -r line; do
-        if [[ "$line" =~ uses:[[:space:]]*([^@[:space:]]+)@([^[:space:]]+) ]]; then
+        if [[ "$line" =~ uses:[[:space:]]*[\"\']?([^@\"\'[:space:]]+)[\"\']?@[\"\']?([^\"\'[:space:]]+)[\"\']? ]]; then
             local action="${BASH_REMATCH[1]}"
             local version="${BASH_REMATCH[2]}"
             

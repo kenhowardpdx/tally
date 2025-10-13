@@ -301,9 +301,11 @@ When working with pull requests, use the GitHub CLI in non-interactive mode to a
 TERM=dumb gh pr view <pr-number> --comments
 
 # Get specific review/comment data using the API
+# Replace 'owner' and 'repo' with your actual repository owner and name
 gh api repos/owner/repo/pulls/<pr-number>/comments
 
 # Extract specific comment details with jq
+# Replace 'owner' and 'repo' with your actual repository owner and name
 gh api repos/owner/repo/pulls/<pr-number>/comments | jq -r '.[] | "\(.path):\(.line) - \(.body)"'
 
 # List PRs for current branch

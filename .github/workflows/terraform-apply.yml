@@ -56,22 +56,22 @@ jobs:
         id: plan
         run: |
           if [[ "$ACT" == "true" ]]; then
-            printf "bucket=\"act-test\"\nkey=\"test.tfstate\"\nregion=\"us-west-2\"\n" > backend.conf
-            terraform init -backend-config=backend.conf
+            echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
+            sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
+            terraform init -backend-config=backend.conf.tmp
             init_exit_code=$?
             if [[ $init_exit_code -ne 0 ]]; then
               echo "terraform init failed in ACT mode (exit code: $init_exit_code)"
-              # Expected: backend config changed, no S3 access - proceed with testing
               echo "plan_exit_code=2" >> $GITHUB_OUTPUT
               echo "has_changes=true" >> $GITHUB_OUTPUT
             else
-              # Unexpected success in ACT mode
               echo "plan_exit_code=0" >> $GITHUB_OUTPUT
               echo "has_changes=false" >> $GITHUB_OUTPUT
             fi
           else
-            printf "bucket=\"terraform-state-$AWS_ACCOUNT_ID\"\nkey=\"tally/prod/terraform.tfstate\"\nregion=\"us-west-2\"\nencrypt=true\n" > backend.conf
-            terraform init -backend-config=backend.conf
+            echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
+            sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
+            terraform init -backend-config=backend.conf.tmp
             terraform validate
             set +e  # Allow plan to exit with non-zero codes
             terraform plan -out=tfplan -detailed-exitcode

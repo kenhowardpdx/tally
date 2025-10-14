@@ -9,13 +9,13 @@ on:
       environment:
         description: "Environment to deploy"
         required: true
-        default: "production"
+        default: "prod"
         type: choice
         options:
-          - production
+          - prod
 
 concurrency:
-  group: terraform-apply-production
+  group: terraform-apply-prod
   cancel-in-progress: false
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
           [[ "$ACT" != "true" ]] && aws sts get-caller-identity >/dev/null
           terraform fmt -check -recursive
         env:
-          TF_VAR_environment: ${{ inputs.environment || 'production' }}
+          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
 
       - name: Init & Plan
         id: plan
@@ -87,7 +87,7 @@ jobs:
           fi
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          TF_VAR_environment: ${{ inputs.environment || 'production' }}
+          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Apply
@@ -99,7 +99,7 @@ jobs:
             terraform apply -auto-approve tfplan
           fi
         env:
-          TF_VAR_environment: ${{ inputs.environment || 'production' }}
+          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Output

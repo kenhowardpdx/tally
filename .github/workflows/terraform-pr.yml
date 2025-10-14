@@ -16,6 +16,8 @@ jobs:
       run:
         working-directory: infra
     steps:
+      - uses: actions/checkout@v5
+
       - name: Check for infra changes
         id: infra_changes
         uses: actions/github-script@v7
@@ -35,41 +37,44 @@ jobs:
         if: steps.infra_changes.outputs.noop == 'true'
         run: echo "No infra changes detected. Skipping Terraform steps."
 
-      - name: Continue if infra changes
-        if: steps.infra_changes.outputs.noop != 'true'
-        run: echo "Infra changes detected. Running Terraform steps."
-      - uses: actions/checkout@v5
       - name: Configure AWS credentials
+        if: steps.infra_changes.outputs.noop != 'true'
         run: |
           if [ "$ACT" = "true" ]; then
             echo "Configuring AWS credentials for ACT/local run."
-            # ACT automatically injects secrets as environment variables
             env | grep AWS_
           else
             echo "Configuring AWS credentials for CI/CD run."
           fi
+
       - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.infra_changes.outputs.noop != 'true'
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
-        if: ${{ !env.ACT }}
+
       - name: Configure AWS credentials for ACT/local
-        if: ${{ env.ACT == 'true' }}
+        if: steps.infra_changes.outputs.noop != 'true' && env.ACT == 'true'
         run: |
           echo "Configuring AWS credentials for ACT/local run."
           export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           export AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
           export AWS_REGION=us-west-2
+
       - uses: hashicorp/setup-terraform@v3
+        if: steps.infra_changes.outputs.noop != 'true'
         with:
           terraform_wrapper: false
+
       - uses: actions/cache@v4
+        if: steps.infra_changes.outputs.noop != 'true'
         with:
-          path: ./infra/.terraform
-          key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}
+          path: .terraform
+          key: terraform-${{ hashFiles('.terraform.lock.hcl') }}
 
       - name: Init
+        if: steps.infra_changes.outputs.noop != 'true'
         run: |
           if [ "$ACT" = "true" ]; then
             echo 'Using local backend for ACT run.'
@@ -84,14 +89,17 @@ jobs:
           AWS_REGION: us-west-2
 
       - name: Check Formatting
+        if: steps.infra_changes.outputs.noop != 'true'
         run: terraform fmt -check -recursive
 
       - name: Validate
+        if: steps.infra_changes.outputs.noop != 'true'
         run: terraform validate
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Plan
+        if: steps.infra_changes.outputs.noop != 'true'
         id: plan
         run: |
           # Clean up backend config for ACT/local run

@@ -1,5 +1,5 @@
 terraform {
-# Trigger workflow: Copilot 2025-10-14
+  # Trigger workflow: Copilot 2025-10-14
   required_version = ">= 1.0.0"
   required_providers {
     aws = {

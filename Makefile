@@ -1,7 +1,7 @@
 # Tally Project Makefile
 # This Makefile provides common development tasks and GitHub Actions testing
 
-.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-setup
+.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-setup clean-terraform
 
 # Default target
 help: ## Show this help message
@@ -9,6 +9,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 # GitHub workflow testing with act
+
 .github_workflow_%:
 	@if [ ! -f .github/workflows/$*.yml ]; then \
 		echo "Error: Workflow '.github/workflows/$*.yml' not found"; \
@@ -19,10 +20,14 @@ help: ## Show this help message
 		echo "Error: AWS_PROFILE not found. Add to .secrets or environment."; \
 		exit 1; \
 	fi
+	@if [ -f .secrets ]; then \
+		echo "Sourcing .secrets for environment variables..."; \
+		. ./.secrets; \
+	fi; \
 	act pull_request \
 		--secret-file .secrets \
 		--container-options "-v $(HOME)/.aws:/root/.aws:ro" \
-		--env AWS_DEFAULT_REGION=us-west-2 \
+		--env AWS_DEFAULT_REGION=$${AWS_DEFAULT_REGION:-us-west-2} \
 		--env ACT=true \
 		-W .github/workflows/$*.yml
 
@@ -84,3 +89,7 @@ install-git-hooks: ## Install git hooks for pre-commit validation
 uninstall-git-hooks: ## Remove git hooks
 	@rm -f .git/hooks/pre-commit
 	@echo "Git hooks removed"
+
+clean-terraform: ## Remove Terraform local state and cache
+	rm -rf infra/.terraform infra/.terraform.lock.hcl infra/backend.conf infra/plan.txt infra/tfplan
+	echo "Terraform local state and cache cleaned."

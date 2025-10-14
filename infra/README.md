@@ -196,13 +196,36 @@ Currently, all modules are commented out in `main.tf` as placeholders. Uncomment
 
 ## Configuration Files
 
-| File                   | Purpose                              |
-| ---------------------- | ------------------------------------ |
-| `main.tf`              | Main Terraform configuration         |
-| `variables_outputs.tf` | Input variables and outputs          |
-| `Makefile`             | Build automation and AWS integration |
-| `.aws-credentials`     | Cached AWS credentials (git-ignored) |
-| `modules/*/`           | Reusable infrastructure modules      |
+| File                   | Purpose                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `main.tf`              | Main Terraform configuration                               |
+| `variables_outputs.tf` | Input variables and outputs                                |
+| `Makefile`             | Build automation and AWS integration                       |
+| `.aws-credentials`     | Cached AWS credentials (git-ignored)                       |
+| `modules/*/`           | Reusable infrastructure modules                            |
+| `backend.conf.json`    | S3 backend config for Terraform state (used only in CI/CD) |
+
+### S3 Backend Configuration (backend.conf.json)
+
+`backend.conf.json` contains the S3 backend configuration for storing Terraform state remotely in CI/CD workflows. This file is **not used for local/ACT runs**—local runs use a local backend to avoid S3 charges and simplify development.
+
+**Example contents:**
+
+```json
+{
+  "bucket": "terraform-state-<aws_account_id>",
+  "key": "tally/prod/terraform.tfstate",
+  "region": "us-west-2",
+  "encrypt": true
+}
+```
+
+**Usage:**
+
+- CI/CD workflows copy this file to `backend.conf` and run `terraform init -backend-config=backend.conf`.
+- For local/ACT runs, use `make init-local` to initialize with a local backend.
+
+See `docs/DEVELOPING.md` for more on backend switching and workflow logic.
 
 ## Environment Management
 

@@ -39,11 +39,19 @@ module "vpc" {
 #   lambda_security_group_id   = module.vpc.lambda_security_group_id
 # }
 
+data "aws_secretsmanager_secret" "rds_password" {
+  name = "${var.environment}-rds-postgres-password"
+}
+
+data "aws_secretsmanager_secret_version" "rds_password_version" {
+  secret_id = data.aws_secretsmanager_secret.rds_password.id
+}
+
 module "rds" {
   source             = "./modules/rds"
   db_name            = "tally"
-  db_username        = "admin"
-  db_password        = "example-password" # Replace with reference to Secrets Manager in production
+  db_username        = "tallyadmin"
+  db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
   db_subnet_group    = module.vpc.db_subnet_group
   security_group_ids = [module.vpc.rds_security_group_id]
   tags = {

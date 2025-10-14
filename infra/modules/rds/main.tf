@@ -3,7 +3,7 @@
 resource "aws_db_instance" "main" {
   allocated_storage       = 20 # Free tier limit
   engine                  = "postgres"
-  engine_version          = "15.3"        # Latest supported free tier version
+  engine_version          = "15.2"        # Latest supported free tier version
   instance_class          = "db.t3.micro" # Free tier eligible
   db_name                 = var.db_name
   username                = var.db_username
@@ -19,9 +19,11 @@ resource "aws_db_instance" "main" {
 }
 
 # Secrets Manager integration (password rotation, etc.)
-resource "aws_secretsmanager_secret" "db" {
-  name        = "${var.environment}-rds-postgres-password"
-  description = "RDS PostgreSQL password for ${var.environment}"
-  tags        = var.tags
-}
+
+# Secret is now managed manually in AWS Secrets Manager.
+# Name: ${var.environment}-rds-postgres-password
+# Description: RDS PostgreSQL password for ${var.environment}
+# Tags: ${var.tags}
+# Recovery window: 7 days
+# Rotation: (keep as previously configured)
 

@@ -6,7 +6,7 @@ terraform {
       version = ">= 5.0"
     }
   }
-  # Backend configuration is now provided via workflow (see .github/workflows/terraform-pr.yml)
+  backend "local" {}
 }
 
 provider "aws" {

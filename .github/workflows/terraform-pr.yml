@@ -48,6 +48,7 @@ jobs:
             echo 'Using local backend for ACT run.'
             make init-local
           else
+            echo 'terraform { backend "s3" {} }' > backend.tf
             sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
             terraform init -backend-config=backend.conf.tmp
           fi

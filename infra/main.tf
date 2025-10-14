@@ -40,7 +40,7 @@ module "vpc" {
 # }
 
 data "aws_secretsmanager_secret" "rds_password" {
-  name = "${var.environment}-rds-postgres-password"
+  name = "prod-rds-postgres-password"
 }
 
 data "aws_secretsmanager_secret_version" "rds_password_version" {

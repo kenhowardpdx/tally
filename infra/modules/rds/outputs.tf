@@ -8,7 +8,4 @@ output "rds_endpoint" {
   value       = aws_db_instance.main.endpoint
 }
 
-output "rds_secret_arn" {
-  description = "Secrets Manager ARN for DB password"
-  value       = aws_secretsmanager_secret.db.arn
-}
+

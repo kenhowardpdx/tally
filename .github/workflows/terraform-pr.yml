@@ -48,8 +48,8 @@ jobs:
             echo 'Using local backend for ACT run.'
             make init-local
           else
-            sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf.json > backend.conf
-            terraform init -backend-config=backend.conf
+            sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
+            terraform init -backend-config=backend.conf.tmp
           fi
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}

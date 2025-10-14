@@ -3,7 +3,6 @@ name: Terraform PR
 on:
   pull_request:
     branches: [main]
-    paths: ["infra/**"]
 
 permissions:
   id-token: write
@@ -17,6 +16,28 @@ jobs:
       run:
         working-directory: ./infra
     steps:
+      - name: Check for infra changes
+        id: infra_changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = await github.paginate(
+              github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              }
+            );
+            const infraChanged = files.some(f => f.filename.startsWith('infra/'));
+            core.setOutput('noop', infraChanged ? 'false' : 'true');
+
+      - name: No infra changes, noop
+        if: steps.infra_changes.outputs.noop == 'true'
+        run: echo "No infra changes detected. Skipping Terraform steps."
+
+      - name: Continue if infra changes
+        if: steps.infra_changes.outputs.noop != 'true'
+        run: echo "Infra changes detected. Running Terraform steps."
       - uses: actions/checkout@v5
       - name: Configure AWS credentials
         run: |

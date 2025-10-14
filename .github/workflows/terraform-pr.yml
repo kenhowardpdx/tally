@@ -74,7 +74,6 @@ jobs:
         id: plan
         run: |
           # Clean up backend config for ACT/local run
-          rm -f backend.conf ../.github/workflows/backend.conf.json
           if [ "$ACT" = "true" ]; then
             echo 'Using local backend for ACT run.'
             make init-local

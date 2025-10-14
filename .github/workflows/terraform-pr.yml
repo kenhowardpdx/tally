@@ -29,8 +29,11 @@ jobs:
           fi
       - uses: aws-actions/configure-aws-credentials@v4
         with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-west-2
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
@@ -45,7 +48,7 @@ jobs:
             echo 'Using local backend for ACT run.'
             make init-local
           else
-            cp .github/workflows/backend.conf.json backend.conf
+            sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" infra/backend.conf.json > backend.conf
             terraform init -backend-config=backend.conf
           fi
         env:

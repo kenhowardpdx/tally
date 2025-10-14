@@ -16,13 +16,14 @@
 
 
 
-act-plan: ## Run GitHub Actions workflow (terraform-pr) with AWS creds (from project root, mounts ~/.aws)
+
+act-plan: ## Run GitHub Actions workflow (terraform-pr) with AWS creds (from project root, mounts ~/.aws, injects secrets)
 	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
 	[ -f "$$HOME/.aws/credentials" ] || { echo "❌ ~/.aws/credentials not found or not mounted. ACT will fail. See docs for setup."; exit 1; }
 	set -a && source ../.secrets && set +a && \
 	ACT_ENV="AWS_PROFILE=$$AWS_PROFILE AWS_ROLE_ARN=$$AWS_ROLE_ARN TF_VAR_aws_account_id=$$TF_VAR_aws_account_id TF_VAR_aws_profile=$$TF_VAR_aws_profile" && \
-	echo "Running: (cd .. && act -j validate --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
-	(cd .. && act -j validate --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)
+	echo "Running: (cd .. && act -j validate --secret-file .secrets --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
+	(cd .. && act -j validate --secret-file .secrets --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)
 
 
 

@@ -50,6 +50,12 @@ jobs:
           else
             echo 'terraform {\n  backend "s3" {}\n}' > backend.tf
             sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
+            echo "==== backend.tf ===="
+            cat backend.tf
+            echo "==== main.tf ===="
+            cat main.tf
+            echo "==== backend.conf.tmp ===="
+            cat backend.conf.tmp || echo "No backend.conf.tmp found"
             terraform init -backend-config=backend.conf.tmp
           fi
         env:

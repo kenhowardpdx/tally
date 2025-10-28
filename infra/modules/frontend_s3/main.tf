@@ -4,10 +4,6 @@ resource "aws_s3_bucket" "frontend" {
   tags          = var.tags
 }
 
-resource "aws_s3_bucket_acl" "frontend_acl" {
-  bucket = aws_s3_bucket.frontend.id
-  acl    = "public-read"
-}
 
 resource "aws_s3_bucket_website_configuration" "frontend" {
   bucket = aws_s3_bucket.frontend.id
@@ -19,34 +15,21 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
   }
 }
 
-resource "aws_s3_bucket_policy" "frontend_public_read" {
-  bucket = aws_s3_bucket.frontend.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = ["s3:GetObject"]
-        Resource  = ["${aws_s3_bucket.frontend.arn}/*"]
-      }
-    ]
-  })
-}
 
 # Secure bucket policy for CloudFront OAC
+
 resource "aws_s3_bucket_policy" "frontend_cloudfront" {
   bucket = aws_s3_bucket.frontend.id
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow"
+        Effect = "Allow",
         Principal = {
           Service = "cloudfront.amazonaws.com"
-        }
-        Action   = ["s3:GetObject"]
-        Resource = ["${aws_s3_bucket.frontend.arn}/*"]
+        },
+        Action   = ["s3:GetObject"],
+        Resource = ["${aws_s3_bucket.frontend.arn}/*"],
         Condition = {
           StringEquals = {
             "AWS:SourceArn" = "arn:aws:cloudfront::${var.aws_account_id}:distribution/*"

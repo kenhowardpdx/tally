@@ -50,7 +50,7 @@ data "aws_secretsmanager_secret_version" "rds_password_version" {
 
 module "rds" {
   source             = "./modules/rds"
-  db_name            = "tally"
+  db_name            = "tallydb"
   db_username        = "tallyadmin"
   db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
   db_subnet_group    = module.vpc.db_subnet_group

@@ -31,9 +31,10 @@ module "vpc" {
 }
 
 module "frontend_s3" {
-  source         = "./modules/frontend_s3"
-  bucket_name    = "tally-frontend-${var.environment}-${var.aws_account_id}"
-  aws_account_id = var.aws_account_id
+  source                      = "./modules/frontend_s3"
+  bucket_name                 = "tally-frontend-${var.environment}-${var.aws_account_id}"
+  aws_account_id              = var.aws_account_id
+  cloudfront_distribution_arn = module.cloudfront.cloudfront_distribution_arn
   tags = {
     Environment = var.environment
     Project     = "tally"

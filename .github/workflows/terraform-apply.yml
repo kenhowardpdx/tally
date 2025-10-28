@@ -115,7 +115,7 @@ jobs:
           fi
 
       - name: Sync S3 Frontend
-        if: success() && steps.plan.outputs.has_changes == 'true' && env.TF_VAR_environment == 'prod' && env.ACT != 'true'
+        if: success() && (steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch') && env.ACT != 'true'
         run: |
           bucket_name=$(terraform output -raw frontend_static_bucket_name 2>/dev/null)
           aws s3 sync ../frontend/build/ s3://$bucket_name/ --delete

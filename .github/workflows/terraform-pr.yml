@@ -111,7 +111,7 @@ jobs:
             sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
             terraform init -backend-config=backend.conf.tmp
           fi
-          terraform plan -no-color -out=tfplan 2>&1 | tee plan.txt
+          terraform plan -no-color -out=tfplan 2>&1 | tee tfplan.txt
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
         env:
@@ -120,12 +120,17 @@ jobs:
         continue-on-error: true
 
       - name: Comment
-        if: github.event_name == 'pull_request' && !env.ACT
+        if: github.event_name == 'pull_request' && !env.ACT && steps.plan.outputs.exit_code != '0'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('infra/plan.txt', 'utf8');
+            let plan = '';
+            try {
+              plan = fs.readFileSync('infra/tfplan.txt', 'utf8');
+            } catch (err) {
+              plan = 'No plan output';
+            }
             const exitCode = '${{ steps.plan.outputs.exit_code }}';
             const status = exitCode === '0' ? '✅ No changes' : 
                           exitCode === '2' ? '📋 Changes detected' : '❌ Failed';
@@ -168,7 +173,7 @@ jobs:
         run: |
           if [ "$ACT" = "true" ]; then
             echo "Exit code: ${{ steps.plan.outputs.exit_code }}"
-            cat plan.txt 2>/dev/null || echo "No plan output"
+            cat tfplan.txt 2>/dev/null || echo "No plan output"
           fi
 
       - name: Fail Check

@@ -1,3 +1,8 @@
+
+variable "cloudfront_distribution_arn" {
+  description = "CloudFront distribution ARN for bucket policy"
+  type        = string
+}
 variable "bucket_name" {
   description = "Name of the S3 bucket for frontend static site."
   type        = string

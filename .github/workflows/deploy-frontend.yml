@@ -1,0 +1,75 @@
+name: Deploy Frontend Assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "frontend/build/**"
+      - "frontend/package.json"
+      - "frontend/vite.config.ts"
+      - "frontend/svelte.config.js"
+      - "frontend/tsconfig.json"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache Yarn Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/yarn
+          key: yarn-${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Check for yarn.lock
+        run: |
+          if [ ! -f yarn.lock ]; then
+            echo "❌ yarn.lock not found. Aborting deployment."
+            exit 1
+          fi
+
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build Assets
+        run: yarn build
+
+      - name: Verify Build Output
+        run: |
+          if [ ! -d build ] || [ -z "$(ls -A build)" ]; then
+            echo "❌ Build output missing or empty. Aborting deployment."
+            exit 1
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: deploy-frontend-${{ github.run_id }}
+          aws-region: us-west-2
+
+      - name: Sync to S3
+        env:
+          AWS_REGION: us-west-2
+        run: |
+          cd build
+          bucket_name=$(aws s3api list-buckets --region "$AWS_REGION" --query "Buckets[?starts_with(Name, 'tally-frontend-')].Name" --output text)
+          if [ -z "$bucket_name" ]; then
+            echo "❌ No matching S3 bucket found. Aborting deployment."
+            exit 1
+          fi
+          aws s3 sync . s3://$bucket_name/ --region "$AWS_REGION" --delete || { echo "❌ S3 sync failed."; exit 1; }

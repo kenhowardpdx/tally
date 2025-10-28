@@ -53,6 +53,11 @@ output "rds_security_group_id" {
   value       = module.vpc.rds_security_group_id
 }
 
+output "rds_password_secret_arn" {
+  description = "Secrets Manager ARN for RDS password"
+  value       = data.aws_secretsmanager_secret.rds_password.arn
+}
+
 # Placeholder outputs - commented out until modules are implemented
 
 # output "lambda_function_arn" {

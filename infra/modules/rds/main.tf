@@ -1,9 +1,3 @@
-
-# Fetch RDS password from AWS Secrets Manager
-data "aws_secretsmanager_secret_version" "rds_password" {
-  secret_id = "${var.environment}-rds-postgres-password"
-}
-
 # RDS PostgreSQL Module - Cost-Optimized for Free Tier
 resource "aws_db_instance" "main" {
   allocated_storage       = 20 # Free tier limit
@@ -12,7 +6,7 @@ resource "aws_db_instance" "main" {
   instance_class          = "db.t3.micro" # Free tier eligible
   db_name                 = var.db_name
   username                = var.db_username
-  password                = data.aws_secretsmanager_secret_version.rds_password.secret_string
+  password                = var.db_password
   db_subnet_group_name    = var.db_subnet_group
   vpc_security_group_ids  = var.security_group_ids
   skip_final_snapshot     = true
@@ -23,11 +17,4 @@ resource "aws_db_instance" "main" {
   tags                    = var.tags
 }
 
-# Secrets Manager integration (password rotation, etc.)
-# Secret is now managed manually in AWS Secrets Manager.
-# Name: ${var.environment}-rds-postgres-password
-# Description: RDS PostgreSQL password for ${var.environment}
-# Tags: ${var.tags}
-# Recovery window: 7 days
-# Rotation: (keep as previously configured)
 

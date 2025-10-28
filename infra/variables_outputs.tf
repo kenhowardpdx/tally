@@ -75,3 +75,81 @@ output "rds_password_secret_arn" {
 # output "route53_domain_name" {
 #   value = module.route53.domain_name
 # }
+
+# VPC Module Additional Outputs
+output "vpc_cidr_block" {
+  description = "CIDR block of the VPC"
+  value       = module.vpc.vpc_cidr_block
+}
+
+output "internet_gateway_id" {
+  description = "ID of the Internet Gateway"
+  value       = module.vpc.internet_gateway_id
+}
+
+output "public_route_table_id" {
+  description = "ID of the public route table"
+  value       = module.vpc.public_route_table_id
+}
+
+output "bastion_security_group_id" {
+  description = "ID of the Bastion security group"
+  value       = module.vpc.bastion_security_group_id
+}
+
+output "db_subnet_group" {
+  description = "RDS DB subnet group name"
+  value       = module.vpc.db_subnet_group
+}
+
+# RDS Module Outputs
+output "rds_instance_id" {
+  description = "RDS instance ID"
+  value       = module.rds.rds_instance_id
+}
+
+output "rds_endpoint" {
+  description = "RDS endpoint"
+  value       = module.rds.rds_endpoint
+}
+
+output "rds_db_name" {
+  description = "RDS database name"
+  value       = module.rds.rds_db_name
+}
+
+output "rds_username" {
+  description = "RDS master username"
+  value       = module.rds.rds_username
+}
+
+output "rds_port" {
+  description = "RDS port"
+  value       = module.rds.rds_port
+}
+
+# Bastion Module Outputs
+output "bastion_public_ip" {
+  description = "Public IP of bastion host"
+  value       = module.bastion.bastion_public_ip
+}
+
+output "bastion_id" {
+  description = "Instance ID of bastion host"
+  value       = module.bastion.bastion_id
+}
+
+output "bastion_ssh_username" {
+  description = "SSH username for bastion host"
+  value       = module.bastion.bastion_ssh_username
+}
+
+output "bastion_ssh_key_name" {
+  description = "SSH key name for bastion host"
+  value       = module.bastion.bastion_ssh_key_name
+}
+
+output "bastion_ssh_port" {
+  description = "SSH port for bastion host"
+  value       = module.bastion.bastion_ssh_port
+}

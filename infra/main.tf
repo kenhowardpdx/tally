@@ -30,8 +30,32 @@ module "vpc" {
   # Lambda functions will run in public subnets with security groups
 }
 
+module "frontend_s3" {
+  source         = "./modules/frontend_s3"
+  bucket_name    = "tally-frontend-${var.environment}-${var.aws_account_id}"
+  aws_account_id = var.aws_account_id
+  tags = {
+    Environment = var.environment
+    Project     = "tally"
+    Purpose     = "frontend-static-site"
+    CostCenter  = "solo-developer"
+  }
+}
+
+module "cloudfront" {
+  source      = "./modules/cloudfront"
+  bucket_name = "tally-frontend-${var.environment}-${var.aws_account_id}"
+  tags = {
+    Environment = var.environment
+    Project     = "tally"
+    Purpose     = "frontend-static-site"
+    CostCenter  = "solo-developer"
+  }
+}
+
 # Placeholder modules - commented out until implementation
 # Uncomment and configure these modules as you implement each component
+
 
 # module "lambda" {
 #   source = "./modules/lambda"
@@ -74,6 +98,18 @@ module "bastion" {
     Purpose     = "bastion"
   }
 }
+# Bastion module disabled for now
+# module "bastion" {
+#   source            = "./modules/bastion"
+#   subnet_id         = module.vpc.public_subnet_ids[0]
+#   security_group_id = module.vpc.lambda_security_group_id
+#   key_name          = "tally-bastion-key-prod" # Project-specific SSH key name
+#   tags = {
+#     Environment = var.environment
+#     Project     = "tally"
+#     Purpose     = "bastion"
+#   }
+# }
 
 # module "api_gateway" {
 #   source = "./modules/api_gateway"
@@ -89,6 +125,12 @@ module "bastion" {
 #   source = "./modules/route53"
 #   # Add route53 module variables here
 # }
+
+module "route53" {
+  source                 = "./modules/route53"
+  cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
+  domain_name            = "kenhoward.dev"
+}
 
 # module "auth0" {
 #   source = "./modules/auth0"

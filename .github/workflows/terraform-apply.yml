@@ -114,6 +114,15 @@ jobs:
             echo "✅ No changes needed"
           fi
 
+      - name: Sync S3 Frontend
+        if: success() && steps.plan.outputs.has_changes == 'true' && env.TF_VAR_environment == 'prod' && env.ACT != 'true'
+        run: |
+          bucket_name=$(terraform output -raw frontend_static_bucket_name 2>/dev/null)
+          aws s3 sync ../frontend/build/ s3://$bucket_name/ --delete
+        env:
+          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+
       - name: Cleanup
         if: failure()
         run: rm -f tfplan

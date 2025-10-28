@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  # IMPORTANT: "backend-test" is a required status check for PRs
-  # Do not rename this job without updating branch protection rules
+  # IMPORTANT: "backend-test" and "frontend-test" are required status checks for PRs
+  # Do not rename these jobs without updating branch protection rules
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -27,3 +27,19 @@ jobs:
           pip install poetry
           poetry install --all-extras
           poetry run pytest
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ./frontend/.nvmrc
+      - name: Test
+        run: |
+          yarn install --frozen-lockfile
+          yarn test

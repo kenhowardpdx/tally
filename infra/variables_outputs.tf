@@ -76,6 +76,11 @@ output "rds_password_secret_arn" {
 #   value = module.route53.domain_name
 # }
 
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name for frontend static site"
+  value       = module.cloudfront.cloudfront_domain_name
+}
+
 # VPC Module Additional Outputs
 output "vpc_cidr_block" {
   description = "CIDR block of the VPC"
@@ -92,64 +97,20 @@ output "public_route_table_id" {
   value       = module.vpc.public_route_table_id
 }
 
-output "bastion_security_group_id" {
-  description = "ID of the Bastion security group"
-  value       = module.vpc.bastion_security_group_id
+
+# Route 53 outputs for DNS setup
+output "route53_domain_name" {
+  description = "Route 53 hosted zone domain name"
+  value       = module.route53.domain_name
 }
 
-output "db_subnet_group" {
-  description = "RDS DB subnet group name"
-  value       = module.vpc.db_subnet_group
+output "route53_name_servers" {
+  description = "Route 53 hosted zone name servers (for registrar setup)"
+  value       = module.route53.name_servers
 }
 
-# RDS Module Outputs
-output "rds_instance_id" {
-  description = "RDS instance ID"
-  value       = module.rds.rds_instance_id
-}
-
-output "rds_endpoint" {
-  description = "RDS endpoint"
-  value       = module.rds.rds_endpoint
-}
-
-output "rds_db_name" {
-  description = "RDS database name"
-  value       = module.rds.rds_db_name
-}
-
-output "rds_username" {
-  description = "RDS master username"
-  value       = module.rds.rds_username
-}
-
-output "rds_port" {
-  description = "RDS port"
-  value       = module.rds.rds_port
-}
-
-# Bastion Module Outputs
-output "bastion_public_ip" {
-  description = "Public IP of bastion host"
-  value       = module.bastion.bastion_public_ip
-}
-
-output "bastion_id" {
-  description = "Instance ID of bastion host"
-  value       = module.bastion.bastion_id
-}
-
-output "bastion_ssh_username" {
-  description = "SSH username for bastion host"
-  value       = module.bastion.bastion_ssh_username
-}
-
-output "bastion_ssh_key_name" {
-  description = "SSH key name for bastion host"
-  value       = module.bastion.bastion_ssh_key_name
-}
-
-output "bastion_ssh_port" {
-  description = "SSH port for bastion host"
-  value       = module.bastion.bastion_ssh_port
+# S3 website endpoint output for reference
+output "frontend_s3_website_endpoint" {
+  description = "S3 static website endpoint for frontend (should be private if using CloudFront)"
+  value       = module.frontend_s3.website_endpoint
 }

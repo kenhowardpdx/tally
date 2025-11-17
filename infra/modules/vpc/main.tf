@@ -10,9 +10,9 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-vpc"
+    Name        = "${var.project}-${var.environment}-vpc"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
   }
 }
 
@@ -21,9 +21,9 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-igw"
+    Name        = "${var.project}-${var.environment}-igw"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
   }
 }
 
@@ -37,9 +37,9 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-public-${var.availability_zones[count.index]}"
+    Name        = "${var.project}-${var.environment}-public-${var.availability_zones[count.index]}"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Type        = "public"
   }
 }
@@ -53,9 +53,9 @@ resource "aws_subnet" "database" {
   availability_zone = var.availability_zones[count.index]
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-database-${var.availability_zones[count.index]}"
+    Name        = "${var.project}-${var.environment}-database-${var.availability_zones[count.index]}"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Type        = "database"
   }
 }
@@ -73,9 +73,9 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-public-rt"
+    Name        = "${var.project}-${var.environment}-public-rt"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Type        = "public"
   }
 }
@@ -98,7 +98,7 @@ resource "aws_route_table_association" "database" {
 
 # Lambda Security Group
 resource "aws_security_group" "lambda" {
-  name_prefix = "${var.project_name}-${var.environment}-lambda-"
+  name_prefix = "${var.project}-${var.environment}-lambda-"
   vpc_id      = aws_vpc.main.id
 
   description = "Security group for Lambda functions"
@@ -113,21 +113,21 @@ resource "aws_security_group" "lambda" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-lambda-sg"
+    Name        = "${var.project}-${var.environment}-lambda-sg"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Purpose     = "lambda"
   }
 }
 
 # RDS Subnet Group (for use by RDS instance)
 resource "aws_db_subnet_group" "rds" {
-  name       = "tally-db-subnet-group"
+  name       = "${var.project}-db-subnet-group"
   subnet_ids = aws_subnet.database[*].id
   tags = {
-    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Name        = "${var.project}-${var.environment}-db-subnet-group"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Purpose     = "rds"
   }
   description = "Database subnet group for RDS"
@@ -135,7 +135,7 @@ resource "aws_db_subnet_group" "rds" {
 
 # RDS Security Group
 resource "aws_security_group" "rds" {
-  name_prefix = "${var.project_name}-${var.environment}-rds-"
+  name_prefix = "${var.project}-${var.environment}-rds-"
   vpc_id      = aws_vpc.main.id
 
   description = "Security group for RDS database"
@@ -150,16 +150,16 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-rds-sg"
+    Name        = "${var.project}-${var.environment}-rds-sg"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Purpose     = "rds"
   }
 }
 
 # Bastion Security Group
 resource "aws_security_group" "bastion" {
-  name_prefix = "${var.project_name}-${var.environment}-bastion-"
+  name_prefix = "${var.project}-${var.environment}-bastion-"
   vpc_id      = aws_vpc.main.id
 
   description = "Security group for Bastion host"
@@ -182,9 +182,9 @@ resource "aws_security_group" "bastion" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-bastion-sg"
+    Name        = "${var.project}-${var.environment}-bastion-sg"
     Environment = var.environment
-    Project     = var.project_name
+    Project     = var.project
     Purpose     = "bastion"
   }
 }

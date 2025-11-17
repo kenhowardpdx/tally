@@ -1,3 +1,15 @@
+module "backend_s3" {
+  source      = "./modules/backend_s3"
+  environment = var.environment
+  project     = var.project
+  bucket_name = "${var.project}-backend-${var.environment}-${var.aws_account_id}-${var.aws_region}"
+  tags = {
+    Environment = var.environment
+    Project     = var.project
+    Purpose     = "lambda-artifacts"
+    CostCenter  = "solo-developer"
+  }
+}
 terraform {
   # Trigger workflow: Copilot 2025-10-14
   required_version = ">= 1.0.0"
@@ -23,7 +35,7 @@ module "vpc" {
 
   vpc_cidr           = "10.0.0.0/20"
   environment        = var.environment
-  project_name       = "tally"
+  project            = var.project
   availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
 
   # NAT Gateway disabled for zero-cost architecture
@@ -32,12 +44,12 @@ module "vpc" {
 
 module "frontend_s3" {
   source                      = "./modules/frontend_s3"
-  bucket_name                 = "tally-frontend-${var.environment}-${var.aws_account_id}"
+  bucket_name                 = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
   aws_account_id              = var.aws_account_id
   cloudfront_distribution_arn = module.cloudfront.cloudfront_distribution_arn
   tags = {
     Environment = var.environment
-    Project     = "tally"
+    Project     = var.project
     Purpose     = "frontend-static-site"
     CostCenter  = "solo-developer"
   }
@@ -45,25 +57,30 @@ module "frontend_s3" {
 
 module "cloudfront" {
   source      = "./modules/cloudfront"
-  bucket_name = "tally-frontend-${var.environment}-${var.aws_account_id}"
+  bucket_name = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
   tags = {
     Environment = var.environment
-    Project     = "tally"
+    Project     = var.project
     Purpose     = "frontend-static-site"
     CostCenter  = "solo-developer"
   }
 }
 
-# Placeholder modules - commented out until implementation
-# Uncomment and configure these modules as you implement each component
+module "lambda" {
+  source                   = "./modules/lambda"
+  vpc_id                   = module.vpc.vpc_id
+  public_subnet_ids        = module.vpc.public_subnet_ids
+  lambda_security_group_id = module.vpc.lambda_security_group_id
 
+  project = var.project
 
-# module "lambda" {
-#   source = "./modules/lambda"
-#   vpc_id                     = module.vpc.vpc_id
-#   public_subnet_ids          = module.vpc.public_subnet_ids
-#   lambda_security_group_id   = module.vpc.lambda_security_group_id
-# }
+  db_name     = module.rds.rds_db_name
+  db_username = module.rds.rds_username
+  db_password = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
+  db_host     = module.rds.rds_endpoint
+
+  lambda_code_s3_bucket = module.backend_s3.bucket_name
+}
 
 data "aws_secretsmanager_secret" "rds_password" {
   name = "prod-rds-postgres-password"
@@ -75,14 +92,14 @@ data "aws_secretsmanager_secret_version" "rds_password_version" {
 
 module "rds" {
   source             = "./modules/rds"
-  db_name            = "tallydb"
-  db_username        = "tallyadmin"
+  db_name            = "${var.project}db"
+  db_username        = "${var.project}admin"
   db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
   db_subnet_group    = module.vpc.db_subnet_group
   security_group_ids = [module.vpc.rds_security_group_id]
   tags = {
     Environment = var.environment
-    Project     = "tally"
+    Project     = var.project
     Purpose     = "rds"
   }
   environment = var.environment
@@ -92,25 +109,13 @@ module "bastion" {
   source            = "./modules/bastion"
   subnet_id         = module.vpc.public_subnet_ids[0]
   security_group_id = module.vpc.lambda_security_group_id
-  key_name          = "tally-bastion-key-prod" # Project-specific SSH key name
+  key_name          = "${var.project}-bastion-key-prod" # Project-specific SSH key name
   tags = {
     Environment = var.environment
-    Project     = "tally"
+    Project     = var.project
     Purpose     = "bastion"
   }
 }
-# Bastion module disabled for now
-# module "bastion" {
-#   source            = "./modules/bastion"
-#   subnet_id         = module.vpc.public_subnet_ids[0]
-#   security_group_id = module.vpc.lambda_security_group_id
-#   key_name          = "tally-bastion-key-prod" # Project-specific SSH key name
-#   tags = {
-#     Environment = var.environment
-#     Project     = "tally"
-#     Purpose     = "bastion"
-#   }
-# }
 
 # module "api_gateway" {
 #   source = "./modules/api_gateway"
@@ -120,11 +125,6 @@ module "bastion" {
 # module "acm" {
 #   source = "./modules/acm"
 #   # Add acm module variables here
-# }
-
-# module "route53" {
-#   source = "./modules/route53"
-#   # Add route53 module variables here
 # }
 
 module "route53" {

@@ -10,8 +10,8 @@ variable "environment" {
   default     = "prod"
 }
 
-variable "project_name" {
-  description = "Name of the project"
+variable "project" {
+  description = "Project name"
   type        = string
   default     = "tally"
 }

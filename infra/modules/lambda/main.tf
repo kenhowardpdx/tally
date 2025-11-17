@@ -35,33 +35,39 @@ resource "aws_iam_role_policy_attachment" "lambda_rds_access" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonRDSFullAccess"
 }
 
-# Lambda function is created and managed by Terraform, but code is deployed via CI/CD (GitHub Actions)
-resource "aws_lambda_function" "backend" {
-  function_name = "${var.project}-backend"
-  handler       = "main.handler"
-  runtime       = "python3.13"
-  s3_bucket     = var.lambda_code_s3_bucket
-  s3_key        = "backend"
-  role          = aws_iam_role.lambda_exec.arn
-
-  vpc_config {
-    subnet_ids         = var.public_subnet_ids
-    security_group_ids = [var.lambda_security_group_id]
-  }
-
-  environment {
-    variables = {
-      DB_NAME     = var.db_name
-      DB_USERNAME = var.db_username
-      DB_PASSWORD = var.db_password
-      DB_HOST     = var.db_host
-    }
+# Placeholder for Lambda build artifact
+resource "null_resource" "lambda_build_placeholder" {
+  provisioner "local-exec" {
+    command = "echo 'Lambda build not yet uploaded. This is a placeholder.'"
   }
 }
 
-output "backend_lambda_function_arn" {
-  value = aws_lambda_function.backend.arn
-}
+# resource "aws_lambda_function" "backend" {
+#   function_name = "${var.project}-backend"
+#   handler       = "main.handler"
+#   runtime       = "python3.13"
+#   s3_bucket     = var.lambda_code_s3_bucket
+#   s3_key        = "backend"
+#   role          = aws_iam_role.lambda_exec.arn
+#
+#   vpc_config {
+#     subnet_ids         = var.public_subnet_ids
+#     security_group_ids = [var.lambda_security_group_id]
+#   }
+#
+#   environment {
+#     variables = {
+#       DB_NAME     = var.db_name
+#       DB_USERNAME = var.db_username
+#       DB_PASSWORD = var.db_password
+#       DB_HOST     = var.db_host
+#     }
+#   }
+# }
+
+# output "backend_lambda_function_arn" {
+#   value = aws_lambda_function.backend.arn
+# }
 
 output "lambda_exec_role_arn" {
   value = aws_iam_role.lambda_exec.arn

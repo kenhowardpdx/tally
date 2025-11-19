@@ -7,6 +7,7 @@ resource "aws_cloudfront_origin_access_control" "s3_oac" {
 }
 
 resource "aws_cloudfront_distribution" "frontend" {
+  depends_on          = [var.acm_certificate_arn]
   enabled             = true
   default_root_object = "index.html"
 

@@ -22,6 +22,14 @@ terraform {
 }
 
 provider "aws" {
+  alias   = "us_east_1"
+  region  = "us-east-1"
+  profile = var.aws_profile
+
+  # Only ACM module should use the us-east-1 provider override
+}
+
+provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile
 
@@ -61,6 +69,9 @@ module "acm" {
   domain_name               = "tally.kenhoward.dev"
   subject_alternative_names = []
   validation_method         = "DNS"
+  providers = {
+    aws = aws.us_east_1
+  }
   tags = {
     Environment = var.environment
     Project     = var.project
@@ -120,6 +131,7 @@ module "rds" {
   }
   environment = var.environment
 }
+
 
 module "bastion" {
   source            = "./modules/bastion"

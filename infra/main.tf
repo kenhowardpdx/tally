@@ -55,9 +55,25 @@ module "frontend_s3" {
   }
 }
 
+# ACM certificate for CloudFront custom domain
+module "acm" {
+  source                    = "./modules/acm"
+  domain_name               = "tally.kenhoward.dev"
+  subject_alternative_names = []
+  validation_method         = "DNS"
+  tags = {
+    Environment = var.environment
+    Project     = var.project
+    Purpose     = "cloudfront-ssl"
+  }
+}
 module "cloudfront" {
-  source      = "./modules/cloudfront"
-  bucket_name = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
+  source                  = "./modules/cloudfront"
+  bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
+  aliases                 = ["tally.kenhoward.dev"]
+  acm_certificate_arn     = module.acm.acm_certificate_arn
+  api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
+  api_path_pattern        = "/api/v1/*"
   tags = {
     Environment = var.environment
     Project     = var.project
@@ -117,10 +133,13 @@ module "bastion" {
   }
 }
 
-# module "api_gateway" {
-#   source = "./modules/api_gateway"
-#   # Add api_gateway module variables here
-# }
+module "api_gateway" {
+  source              = "./modules/api_gateway"
+  lambda_function_arn = module.lambda.backend_lambda_function_arn
+  stage_name          = "prod"
+  api_name            = "tally-api"
+  aws_region          = var.aws_region
+}
 
 # module "acm" {
 #   source = "./modules/acm"

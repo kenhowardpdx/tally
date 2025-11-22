@@ -1,3 +1,8 @@
+# ACM certificate ARN for CloudFront
+variable "certificate_arn" {
+  description = "ARN of the ACM certificate in us-east-1 for CloudFront"
+  type        = string
+}
 variable "api_endpoint_prefix" {
   description = "API endpoint prefix for routing (e.g., /api/v1/)"
   type        = string

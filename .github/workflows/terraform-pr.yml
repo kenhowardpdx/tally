@@ -102,6 +102,7 @@ jobs:
         if: steps.infra_changes.outputs.noop != 'true'
         id: plan
         run: |
+          VAR_FILE=./terraform.tfvars
           # Clean up backend config for ACT/local run
           if [ "$ACT" = "true" ]; then
             echo 'Using local backend for ACT run.'
@@ -111,7 +112,7 @@ jobs:
             sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
             terraform init -backend-config=backend.conf.tmp
           fi
-          terraform plan -no-color -out=tfplan 2>&1 | tee tfplan.txt
+          terraform plan -var-file=${VAR_FILE} -no-color -out=tfplan 2>&1 | tee tfplan.txt
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
         env:

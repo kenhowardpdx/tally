@@ -157,7 +157,6 @@ The infrastructure is organized into reusable modules:
 
 - **`lambda`**: Backend API (Python FastAPI)
 - **`api_gateway`**: HTTP API endpoints and routing
-- **`acm`**: SSL/TLS certificates
 - **`route53`**: DNS and domain management
 - **`auth0`**: Authentication integration
 

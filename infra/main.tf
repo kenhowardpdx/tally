@@ -21,13 +21,6 @@ terraform {
   }
 }
 
-provider "aws" {
-  alias   = "us_east_1"
-  region  = "us-east-1"
-  profile = var.aws_profile
-
-  # Only ACM module should use the us-east-1 provider override
-}
 
 provider "aws" {
   region  = var.aws_region
@@ -63,26 +56,11 @@ module "frontend_s3" {
   }
 }
 
-# ACM certificate for CloudFront custom domain
-module "acm" {
-  source                    = "./modules/acm"
-  domain_name               = "tally.kenhoward.dev"
-  subject_alternative_names = []
-  validation_method         = "DNS"
-  providers = {
-    aws = aws.us_east_1
-  }
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "cloudfront-ssl"
-  }
-}
 module "cloudfront" {
   source                  = "./modules/cloudfront"
   bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
   aliases                 = ["tally.kenhoward.dev"]
-  acm_certificate_arn     = module.acm.acm_certificate_arn
+  acm_certificate_arn     = var.certificate_arn
   api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
   api_path_pattern        = "/api/v1/*"
   tags = {
@@ -153,10 +131,7 @@ module "api_gateway" {
   aws_region          = var.aws_region
 }
 
-# module "acm" {
-#   source = "./modules/acm"
-#   # Add acm module variables here
-# }
+
 
 module "route53" {
   source                 = "./modules/route53"

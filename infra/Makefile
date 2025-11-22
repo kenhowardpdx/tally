@@ -10,7 +10,7 @@
 # Run ACT with AWS credentials from .secrets
 
 
-
+VAR_FILE=./terraform.tfvars
 
 
 
@@ -70,7 +70,7 @@ aws-setup: ## Configure AWS SSO credentials
 	 terraform init -backend-config=backend.conf
 
 	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform plan
+	 terraform plan -var-file=$(VAR_FILE)
 
 	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
 	 terraform show
@@ -80,7 +80,7 @@ aws-setup: ## Configure AWS SSO credentials
 		exit 1; \
 	fi
 	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform apply
+	 terraform apply -var-file=$(VAR_FILE) -auto-approve
 
 validate: ## Validate Terraform configuration
 	@terraform validate

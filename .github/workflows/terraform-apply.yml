@@ -55,6 +55,7 @@ jobs:
       - name: Init & Plan
         id: plan
         run: |
+          VAR_FILE=./terraform.tfvars
           if [[ "$ACT" == "true" ]]; then
             echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
             sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
@@ -74,7 +75,7 @@ jobs:
             terraform init -backend-config=backend.conf.tmp
             terraform validate
             set +e  # Allow plan to exit with non-zero codes
-            terraform plan -out=tfplan -detailed-exitcode
+            terraform plan -var-file=${VAR_FILE} -out=tfplan -detailed-exitcode
             plan_exit_code=$?
             set -e  # Re-enable exit on error
             echo "plan_exit_code=$plan_exit_code" >> $GITHUB_OUTPUT
@@ -93,10 +94,11 @@ jobs:
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
         run: |
+          VAR_FILE=./terraform.tfvars
           if [[ "$ACT" == "true" ]]; then
             echo "🧪 DRY RUN: Would apply changes (exit code: ${{ steps.plan.outputs.plan_exit_code }})"
           else
-            terraform apply -auto-approve tfplan
+            terraform apply -var-file=${VAR_FILE} -auto-approve tfplan
           fi
         env:
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}

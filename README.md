@@ -26,6 +26,24 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 See [Local Terraform Development Guide](docs/LOCAL-TERRAFORM-DEV.md) for detailed workflow.
 
+### Deployment
+
+Deploy frontend and backend independently:
+
+```bash
+# Deploy frontend (builds and syncs to S3)
+make deploy-frontend
+
+# Deploy backend (packages and updates Lambda)
+make deploy-backend
+
+# Specify environment (defaults to dev from .secrets)
+ENVIRONMENT=prod make deploy-frontend
+ENVIRONMENT=prod make deploy-backend
+```
+
+Both commands use your `.secrets` configuration or accept `ENVIRONMENT` variable.
+
 ## Local Workflow Testing
 
 We use [act](https://github.com/nektos/act) to run GitHub Actions locally. See [Development Guide](docs/DEVELOPING.md) for details.

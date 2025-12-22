@@ -1,0 +1,46 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "scripts/deploy-backend.sh"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: deploy-backend-${{ github.run_id }}
+          aws-region: us-west-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Deploy
+        run: make deploy-backend
+        env:
+          ENVIRONMENT: ${{ inputs.environment || 'prod' }}
+          AWS_REGION: us-west-2
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_PROFILE: ""

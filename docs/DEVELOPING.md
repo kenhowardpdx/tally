@@ -434,38 +434,106 @@ aws secretsmanager get-secret-value --secret-id prod-rds-postgres-password --que
 ssh -i /path/to/your-ssh-key.pem ec2-user@<bastion_public_ip>
 ```
 
-## Connect to RDS from Bastion Host
+## Deployment
 
-Once on the bastion host, use psql or any PostgreSQL client:
+Tally provides Makefile targets for deploying frontend and backend independently.
+
+### Frontend Deployment
+
+Deploy the Svelte frontend to S3:
 
 ```bash
-psql -h <rds_endpoint> -U admin -d tally
+# Deploy to dev environment (from .secrets)
+make deploy-frontend
+
+# Deploy to specific environment
+ENVIRONMENT=prod make deploy-frontend
 ```
 
-- `<rds_endpoint>`: Get from Terraform output or AWS Console
-- `admin`: Default username
-- `tally`: Default database name
-- Password: Retrieve from Secrets Manager as above
+**What it does:**
 
-## SSH Port Forwarding (Optional)
+1. Builds the Svelte application using `yarn build`
+2. Syncs built assets to the environment-specific S3 bucket
+3. Uses `--delete` flag to remove stale files
 
-To connect to RDS from your local machine via the bastion:
+**Requirements:**
+
+- AWS credentials configured (via `.secrets` or AWS_PROFILE)
+- TF_VAR_aws_account_id set in `.secrets`
+- Frontend dependencies installed (`yarn install`)
+
+### Backend Deployment
+
+Deploy the Python Lambda function:
 
 ```bash
-ssh -i /path/to/your-ssh-key.pem -L 5432:<rds_endpoint>:5432 ec2-user@<bastion_public_ip>
+# Deploy to dev environment (from .secrets)
+make deploy-backend
+
+# Deploy to specific environment
+ENVIRONMENT=prod make deploy-backend
 ```
 
-Then connect locally:
+**What it does:**
+
+1. Creates a deployment package with application code
+2. Uploads the package to the environment-specific S3 bucket
+3. Updates the Lambda function with the new code
+
+**Requirements:**
+
+- AWS credentials configured (via `.secrets` or AWS_PROFILE)
+- TF_VAR_aws_account_id set in `.secrets`
+- Poetry installed for dependency management
+
+### Deployment Workflow
+
+Typical deployment flow:
 
 ```bash
-psql -h localhost -U admin -d tally
+# 1. Make code changes
+# 2. Test locally
+
+# 3. Deploy to dev environment
+make deploy-backend
+make deploy-frontend
+
+# 4. Verify dev deployment works
+curl https://dev-cloudfront-url.cloudfront.net/api/v1/health
+
+# 5. Deploy to prod (via GitHub Actions or manually)
+ENVIRONMENT=prod make deploy-backend
+ENVIRONMENT=prod make deploy-frontend
+```
+
+### GitHub Actions Integration
+
+Both deployment scripts are used by GitHub Actions workflows:
+
+- `deploy-frontend.yml`: Automatically deploys frontend on push to main
+- Backend deployment: Triggered by Terraform apply (updates Lambda code)
+
+## Database Access
+
+### Connect to Neon Database
+
+Tally uses Neon serverless PostgreSQL. Connection details are available in Terraform outputs:
+
+```bash
+cd infra
+make local-plan | grep -A5 "neon_connection_uri"
+```
+
+Or retrieve from AWS Secrets Manager (for Lambda):
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id tally-dev-neon-credentials \
+  --query SecretString \
+  --output text
 ```
 
 ## Security Notes
-
-- Bastion host should be stopped when not needed to minimize costs.
-- Restrict SSH access to your IP in the bastion security group.
-- Never expose RDS directly to the public internet.
 
 ### Additional Resources
 

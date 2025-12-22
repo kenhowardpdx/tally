@@ -65,14 +65,10 @@ jobs:
           role-session-name: deploy-frontend-${{ github.run_id }}
           aws-region: us-west-2
 
-      - name: Sync to S3
+      - name: Deploy Frontend
+        run: make deploy-frontend
         env:
+          ENVIRONMENT: ${{ inputs.environment || 'prod' }}
           AWS_REGION: us-west-2
-        run: |
-          cd build
-          bucket_name=$(aws s3api list-buckets --region "$AWS_REGION" --query "Buckets[?starts_with(Name, 'tally-frontend-')].Name" --output text)
-          if [ -z "$bucket_name" ]; then
-            echo "❌ No matching S3 bucket found. Aborting deployment."
-            exit 1
-          fi
-          aws s3 sync . s3://$bucket_name/ --region "$AWS_REGION" --delete || { echo "❌ S3 sync failed."; exit 1; }
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_PROFILE: default

@@ -551,6 +551,22 @@ logger.error("Error processing request", exc_info=True)
 - Includes concurrency controls and conditional execution
 - **~60 lines** - production-ready deployment
 
+#### deploy-frontend.yml
+
+- Deploys Svelte frontend to S3 on push to main
+- Triggers on changes to `frontend/**` or deployment script
+- Uses `make deploy-frontend` Makefile target
+- **~70 lines** - automated frontend deployment
+
+#### deploy-backend.yml
+
+- Deploys Python Lambda function on push to main
+- Triggers on changes to `backend/**` or deployment script
+- Uses `make deploy-backend` Makefile target
+- **~45 lines** - automated backend deployment
+
+**Deployment Pattern**: All deployment workflows use Makefile targets for consistency and local testability. Test deployments locally with `make deploy-frontend ENVIRONMENT=dev` or `make deploy-backend ENVIRONMENT=dev` before pushing.
+
 Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
 
 ### Required Status Checks

@@ -1,128 +1,119 @@
-# IMPORTANT: Always use 'make plan' for AWS authentication.
-# NEVER run 'make apply' locally except through testing workflows with ACT.
-# This prevents accidental infrastructure changes and unexpected AWS charges.
-# For real deployments, use GitHub Actions workflows only.
-# Do NOT run 'terraform apply' or 'make apply' directly unless you are in a safe test environment.
-
 # Terraform Infrastructure Makefile
-
-.PHONY: act-plan act-apply
-# Run ACT with AWS credentials from .secrets
-
-
-
-
-
-
-
-
-
-act-plan: ## Run GitHub Actions workflow (terraform-pr) with AWS creds (from project root, mounts ~/.aws, injects secrets)
-	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
-	[ -f "$$HOME/.aws/credentials" ] || { echo "❌ ~/.aws/credentials not found or not mounted. ACT will fail. See docs for setup."; exit 1; }
-	set -a && source ../.secrets && set +a && \
-	ACT_ENV="AWS_PROFILE=$$AWS_PROFILE AWS_ROLE_ARN=$$AWS_ROLE_ARN TF_VAR_aws_account_id=$$TF_VAR_aws_account_id TF_VAR_aws_profile=$$TF_VAR_aws_profile" && \
-	echo "Running: (cd .. && act -j validate --secret-file .secrets --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
-	(cd .. && act -j validate --secret-file .secrets --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)
-
-
-
-
-
-
-
-
-
-act-apply: ## Run GitHub Actions workflow (terraform-apply) with AWS creds (from project root, mounts ~/.aws)
-	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
-	[ -f "$$HOME/.aws/credentials" ] || { echo "❌ ~/.aws/credentials not found or not mounted. ACT will fail. See docs for setup."; exit 1; }
-	set -a && source ../.secrets && set +a && \
-	ACT_ENV="AWS_PROFILE=$$AWS_PROFILE AWS_ROLE_ARN=$$AWS_ROLE_ARN TF_VAR_aws_account_id=$$TF_VAR_aws_account_id TF_VAR_aws_profile=$$TF_VAR_aws_profile" && \
-	echo "Running: (cd .. && act -j apply --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)" && \
-	(cd .. && act -j apply --env AWS_PROFILE=$$AWS_PROFILE --env AWS_ROLE_ARN=$$AWS_ROLE_ARN --env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id --env TF_VAR_aws_profile=$$TF_VAR_aws_profile -v $$HOME/.aws:/root/.aws)
 #
-# NOTE: For local development and ACT runs, use 'make init-local' to avoid S3 backend issues.
-# 'make init' is ONLY for remote/CI use and will configure the S3 backend.
+# RECOMMENDED LOCAL WORKFLOW:
+#   Use ../scripts/tf-local for all local development operations
+#   This uses AWS SSO profile authentication and a separate 'local-dev' workspace
+#
+# Quick Start:
+#   make local-init    # Initialize terraform with S3 backend + local-dev workspace
+#   make local-plan    # Plan infrastructure changes
+#   make local-apply   # Apply changes (prompts for confirmation)
+#   make local-destroy # Destroy all local-dev infrastructure (prompts for confirmation)
+#
+# GitHub Actions Testing:
+#   make act-plan      # Test PR workflow with ACT
+#   make act-apply     # Test apply workflow with ACT (not recommended)
+#
+# Direct terraform commands (advanced):
+#   All make targets below use the tf-local wrapper for proper authentication
+#   You can also run terraform directly if you've sourced .secrets and set up SSO
 
-.PHONY: help aws-setup aws-credentials init init-local plan show apply validate destroy clean fmt check clean-terraform
-# Export AWS SSO credentials to ~/.aws/credentials in INI format
-aws-credentials: ## Export AWS SSO credentials to ~/.aws/credentials in INI format
-	@../scripts/export-aws-credentials.sh
-clean-terraform: ## Remove all Terraform state, lock, and backend config files (safe local reset)
-	@echo "Removing .terraform, .terraform.lock.hcl, backend.conf, backend.conf.json..."
-	rm -rf .terraform .terraform.lock.hcl backend.conf ../.github/workflows/backend.conf.json
-
-init-local: ## Initialize Terraform with local backend (for ACT/local runs)
-	@$(MAKE) clean-terraform
-	@echo "Initializing Terraform with local backend..."
-	terraform init -reconfigure
-
+.PHONY: help local-init local-plan local-apply local-destroy local-fmt local-validate \
+        local-workspace local-state act-plan act-apply clean-terraform clean-state \
+        aws-credentials init-local
 
 help: ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@echo "\n🔧 Tally Infrastructure - Local Development\n"
+	@echo "Quick Start:"
+	@echo "  1. Copy ../.secrets.example to ../.secrets"
+	@echo "  2. Set AWS_PROFILE and TF_VAR_aws_account_id in ../.secrets"
+	@echo "  3. Run: make local-init"
+	@echo "  4. Run: make local-plan\n"
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-aws-setup: ## Configure AWS SSO credentials
-	@../scripts/aws-setup.sh
+# ============================================================================
+# Local Development Targets (using scripts/tf-local wrapper)
+# ============================================================================
 
+local-init: ## Initialize Terraform with S3 backend and local-dev workspace
+	@../scripts/tf-local init
+
+local-plan: ## Run terraform plan for local development
+	@../scripts/tf-local plan
+
+local-apply: ## Apply infrastructure changes (local-dev workspace only)
+	@../scripts/tf-local apply
+
+local-destroy: ## Destroy all infrastructure in local-dev workspace
+	@../scripts/tf-local destroy
+
+local-fmt: ## Format all Terraform files
+	@../scripts/tf-local fmt -recursive
+
+local-validate: ## Validate Terraform configuration
+	@../scripts/tf-local validate
+
+local-workspace: ## Show current Terraform workspace
+	@../scripts/tf-local workspace show
+
+local-state: ## Show Terraform state resources
+	@../scripts/tf-local state list
+
+# ============================================================================
+# GitHub Actions Testing Targets (using ACT)
+# ============================================================================
+
+act-plan: ## Test PR workflow locally with ACT
+	@echo "⚠️  Testing GitHub Actions terraform-pr workflow with ACT"
+	@echo "Make sure you've run: ../scripts/export-aws-credentials.sh"
 	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
-	@set -a && source ../.secrets && set +a && \
-	 printf "bucket=\"terraform-state-$$TF_VAR_aws_account_id\"\nkey=\"tally/prod/terraform.tfstate\"\nregion=\"us-west-2\"\nencrypt=true\n" > backend.conf && \
-	 terraform init -backend-config=backend.conf
+	@(cd .. && make github_workflow_terraform-pr)
 
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform plan
+act-apply: ## Test apply workflow locally with ACT (use with caution)
+	@echo "⚠️  Testing GitHub Actions terraform-apply workflow with ACT"
+	@echo "Make sure you've run: ../scripts/export-aws-credentials.sh"
+	@[ -f "../.secrets" ] || { echo "❌ .secrets file required"; exit 1; }
+	@(cd .. && make github_workflow_terraform-apply)
 
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform show
+# ============================================================================
+# Cleanup and Utility Targets
+# ============================================================================
 
-	if [ -z "$$GITHUB_ACTIONS" ] && [ -z "$$MANUAL_TF_APPLY" ]; then \
-		echo "❌ Refusing to run apply: Only allowed in GitHub Actions CI or with MANUAL_TF_APPLY=1"; \
-		exit 1; \
-	fi
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform apply
+clean-terraform: ## Remove Terraform state, lock, and backend files (safe local reset)
+	@echo "🧹 Cleaning Terraform local files..."
+	@rm -rf .terraform .terraform.lock.hcl backend.tf backend.conf.tmp
+	@echo "✓ Cleaned. Run 'make local-init' to reinitialize."
 
-validate: ## Validate Terraform configuration
-	@terraform validate
+clean-state: ## Remove local terraform state file (WARNING: local backend only)
+	@echo "⚠️  This will remove terraform.tfstate - only safe if using S3 backend"
+	@read -p "Continue? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@rm -f terraform.tfstate terraform.tfstate.backup
+	@echo "✓ Local state files removed"
 
-	@read -p "⚠️  DESTROY all resources? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@[ -f "../.secrets" ] && set -a && source ../.secrets && set +a || true; \
-	 terraform destroy
+clean-all: ## Remove all Terraform files including .terraform directory
+	@echo "⚠️  This will remove ALL Terraform local files"
+	@read -p "Continue? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@rm -rf .terraform .terraform.lock.hcl backend.tf backend.conf.tmp terraform.tfstate terraform.tfstate.backup
+	@echo "✓ All Terraform files removed. Run 'make local-init' to start fresh."
 
-fmt: ## Format Terraform files
-	@terraform fmt -recursive
+# ============================================================================
+# Terraform Workspace Management
+# ============================================================================
 
-clean: ## Clean Terraform cache and state files
-	@read -p "Remove .terraform cache? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@rm -rf .terraform .terraform.lock.hcl
+workspace-list: ## List all Terraform workspaces
+	@../scripts/tf-local workspace list
 
-	@echo "No cached credentials to clean."
+workspace-show: ## Show current Terraform workspace
+	@../scripts/tf-local workspace show
 
-check: ## Check if Terraform is installed
-	@which terraform > /dev/null || { echo "❌ Terraform not found"; exit 1; }
+# ============================================================================
+# Terraform State Management
+# ============================================================================
 
-check-aws: check ## Check if AWS credentials are configured
-	@$(MAKE) -s check-aws-smart
+state-list: ## List all resources in Terraform state
+	@../scripts/tf-local state list
 
-	aws sts get-caller-identity >/dev/null 2>&1 || $(MAKE) -s setup-aws-credentials
-
-setup-aws-credentials: ## Internal: Set up AWS SSO credentials (delegated to script)
-	@../scripts/aws-setup.sh
-
-	@terraform workspace list
-
-	@test -n "$(NAME)" || { echo "❌ NAME required"; exit 1; }
-	@terraform workspace new $(NAME)
-
-	@test -n "$(NAME)" || { echo "❌ NAME required"; exit 1; }
-	@terraform workspace select $(NAME)
-
-	@terraform state list
-
-	@test -n "$(RESOURCE)" || { echo "❌ RESOURCE required"; exit 1; }
-	@terraform state show $(RESOURCE)
-
-dev-setup: check aws-setup init validate ## Complete development setup
-
-ci-check: check validate fmt ## CI/CD validation checks
-	@terraform fmt -check -recursive || { echo "❌ Run 'make fmt'"; exit 1; }
+state-show: ## Show details of a specific resource (usage: make state-show RESOURCE=module.vpc.aws_vpc.main)
+	@test -n "$(RESOURCE)" || { echo "❌ RESOURCE required. Usage: make state-show RESOURCE=module.vpc.aws_vpc.main"; exit 1; }
+	@../scripts/tf-local state show $(RESOURCE)

@@ -115,17 +115,46 @@ Create a `.secrets` file in the project root for local development:
 ```bash
 # .secrets file (never commit - already in .gitignore)
 AWS_PROFILE=AdministratorAccess-123456789012
-AWS_ROLE_ARN=arn:aws:iam::123456789012:role/tally-github-actions-role
 TF_VAR_aws_account_id=123456789012
-TF_VAR_aws_profile=AdministratorAccess-123456789012
+NEON_API_KEY=your-neon-api-key
+TF_VAR_neon_org_id=org-example-12345678
+TF_VAR_neon_project_id=example-project-12345678
 ```
 
 Source it in your shell:
 
 ```bash
 source .secrets
-make github_workflow_terraform-pr  # Now has access to AWS credentials
+make local-plan  # Now has access to AWS credentials and Neon variables
 ```
+
+### Terraform Workspace Strategy
+
+**Two completely isolated environments:**
+
+**Local Development (local-dev workspace):**
+
+- Workspace: `local-dev`
+- Environment: `TF_VAR_environment=dev`
+- Deployment: Local machine via `scripts/tf-local` wrapper
+- Commands: `make local-init`, `make local-plan`, `make local-apply`, `make local-destroy`
+- Infrastructure: Separate Lambda, API Gateway stage `/dev`, CloudFront, Neon `development` branch
+- Domain: Auto-generated CloudFront domain only
+
+**Production (default workspace):**
+
+- Workspace: `default`
+- Environment: `TF_VAR_environment=prod`
+- Deployment: GitHub Actions on push to main
+- Infrastructure: Separate Lambda, API Gateway stage `/prod`, CloudFront, Neon `production` branch
+- Domain: Custom domain `tally.kenhoward.dev` with ACM and Route53
+
+**Shared resources:**
+
+- S3 backend bucket (different state files per workspace)
+- Neon project `example-project-12345678` (different branches per environment)
+
+**Critical**: Never run Terraform commands against prod workspace locally - always use GitHub Actions for prod deployments.
 
 ### Testing
 
@@ -142,11 +171,18 @@ make github_workflow_terraform-pr  # Now has access to AWS credentials
 #### Sensitive Data Protection
 
 - **Never commit secrets, API keys, tokens, or credentials** to any branch
-- **Never commit real AWS account IDs, ARNs, or resource identifiers**
+- **Never commit real AWS account IDs, ARNs, or resource identifiers** - ALWAYS use placeholder `123456789012`
+- **Never commit real Neon org IDs or project IDs** - ALWAYS use placeholders like `org-example-12345678` and `example-project-12345678`
 - **Never commit personal paths** (e.g., `/Users/username/`) - use generic placeholders
 - **Use `.secrets` file** for local development configuration (already in .gitignore)
 - **Use GitHub repository secrets** for CI/CD credentials
-- **Use placeholder values** in documentation and examples (e.g., `123456789012` for AWS account IDs)
+- **Use placeholder values** in ALL documentation, examples, and config files
+
+**CRITICAL PLACEHOLDERS TO USE:**
+- AWS Account ID: `123456789012`
+- AWS Profile: `AdministratorAccess-123456789012`
+- Neon Org ID: `org-example-12345678`
+- Neon Project ID: `example-project-12345678`
 
 #### Configuration Management
 
@@ -157,21 +193,26 @@ make github_workflow_terraform-pr  # Now has access to AWS credentials
 
 #### Code Examples - DO NOT DO:
 
-```hcl
-# ❌ NEVER DO THIS
-bucket = "terraform-state-993450011441"  # Real account ID
-profile = "AdministratorAccess-993450011441"  # Real account ID
+```bash
+# ❌ NEVER DO THIS - Real values
+bucket = "terraform-state-123456789012"  # Real account ID
+profile = "AdministratorAccess-123456789012"  # Real account ID
+neon_org_id = "org-example-12345678"  # Real org ID
+neon_project_id = "example-project-12345678"  # Real project ID
 ```
 
 #### Code Examples - CORRECT:
 
 ```hcl
-# ✅ CORRECT - Use variables
+# ✅ CORRECT - Use variables (never hardcode)
 bucket = "terraform-state-${var.aws_account_id}"
 profile = var.aws_profile
+neon_org_id = var.neon_org_id
+neon_project_id = var.neon_project_id
 
-# ✅ CORRECT - Placeholder in docs
+# ✅ CORRECT - Placeholders in documentation only
 bucket = "terraform-state-123456789012"  # Your AWS account ID
+neon_org_id = "org-example-12345678"  # Your Neon org ID
 ```
 
 #### Emergency Response

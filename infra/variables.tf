@@ -43,4 +43,20 @@ variable "environment" {
   default     = "prod"
   # Set via environment variable TF_VAR_environment
   # GitHub Actions: Uses workflow inputs or defaults to production
+  validation {
+    condition     = contains(["dev", "prod"], var.environment)
+    error_message = "Environment must be either 'dev' or 'prod'."
+  }
+}
+
+variable "neon_org_id" {
+  description = "Neon organization ID (org-example-12345678)"
+  type        = string
+  # Set via environment variable TF_VAR_neon_org_id
+}
+
+variable "neon_project_id" {
+  description = "Shared Neon project ID (example-project-12345678)"
+  type        = string
+  # Set via environment variable TF_VAR_neon_project_id
 }

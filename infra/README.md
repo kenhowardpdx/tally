@@ -1,6 +1,35 @@
 # Tally Infrastructure
 
-This directory contains the Terraform infrastructure as code for deploying Tally to AWS. The infrastructure uses a modular approach with AWS SSO authentication and automated credential management.
+This directory contains the Terraform infrastructure as code for deploying Tally to AWS. The infrastructure uses a modular approach with workspace-based environment isolation.
+
+## Workspace Strategy
+
+**Two completely separate environments using Terraform workspaces:**
+
+### Production (default workspace)
+
+- **Workspace**: `default`
+- **Environment**: `TF_VAR_environment=prod`
+- **Deployment**: GitHub Actions (automated on push to main)
+- **Custom domain**: `tally.kenhoward.dev`
+- **API stage**: `/prod`
+- **Neon branch**: `production`
+
+### Development (local-dev workspace)
+
+- **Workspace**: `local-dev`
+- **Environment**: `TF_VAR_environment=dev`
+- **Deployment**: Local machine via `make local-*` commands
+- **Domain**: Auto-generated CloudFront domain
+- **API stage**: `/dev`
+- **Neon branch**: `development`
+
+**Key differences:**
+
+- Each workspace creates **separate infrastructure** (different Lambda, API Gateway, CloudFront, etc.)
+- Shared Neon project (`example-project-12345678`) but **different branches** per environment
+- Production includes ACM certificate and Route53 DNS (dev does not)
+- Both use the same S3 backend but different state files
 
 ## Architecture Overview
 
@@ -23,23 +52,18 @@ graph TB
         end
 
         subgraph Data["Data Layer"]
-            RDS["RDS PostgreSQL<br/>(Database)"]
-            Secrets["AWS Secrets Manager<br/>(DB Credentials)"]
+            Neon["Neon PostgreSQL<br/>(Serverless Database)"]
         end
     end
 
     User["User Browser"]
-    Auth0["Auth0<br/>Authentication Service"]
 
     User --> R53
-    User <--> Auth0
     R53 --> CF
     CF --> S3
     User --> APIGW
     APIGW --> Lambda
-    Lambda --> Auth0
-    Lambda --> RDS
-    Lambda --> Secrets
+    Lambda --> Neon
 ```
 
 ## Prerequisites
@@ -60,150 +84,145 @@ graph TB
 
 ### 1. Initial Setup
 
+````sh
+## Local Development Quick Start
+
+**Recommended approach for testing infrastructure changes:**
+
 ```sh
 # Navigate to infrastructure directory
 cd infra
 
-# Configure your AWS account details
-cp terraform.tfvars.example terraform.tfvars
-cp backend.conf.example backend.conf
+# Configure local secrets (one time setup)
+cp ../.secrets.example ../.secrets
+# Edit ../.secrets with your AWS_PROFILE, account ID, and Neon credentials
 
-# Edit these files with your actual AWS account ID and profile name
-# vim terraform.tfvars
-# vim backend.conf
+# Initialize local-dev workspace
+make local-init
 
-# Complete development setup (checks tools, sets up AWS, initializes Terraform)
-make dev-setup
-```
-
-### 2. Infrastructure Management
-
-```sh
 # Plan infrastructure changes
-make plan
+make local-plan
 
-# Apply changes (with confirmation prompt)
-make apply
+# Apply changes to local-dev environment
+make local-apply
 
-# View current state
-make show
-
-# Destroy infrastructure (with confirmation prompt)
-make destroy
-```
+# Destroy local-dev infrastructure when done
+make local-destroy
+````
 
 ## Makefile Commands
 
-### Core Commands
+### Local Development (Recommended)
 
-| Command          | Description                              |
-| ---------------- | ---------------------------------------- |
-| `make help`      | Show all available commands              |
-| `make dev-setup` | Complete development environment setup   |
-| `make plan`      | Create and show Terraform execution plan |
-| `make apply`     | Apply Terraform configuration            |
-| `make destroy`   | Destroy all managed infrastructure       |
+| Command               | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| `make local-init`     | Initialize Terraform with S3 backend + local-dev workspace |
+| `make local-plan`     | Plan infrastructure changes in local-dev                   |
+| `make local-apply`    | Apply changes to local-dev environment                     |
+| `make local-destroy`  | Destroy all local-dev infrastructure                       |
+| `make local-fmt`      | Format all Terraform files                                 |
+| `make local-validate` | Validate Terraform configuration                           |
 
-### AWS Credential Management
+### Terraform State Management
 
-| Command                  | Description                               |
-| ------------------------ | ----------------------------------------- |
-| `make aws-setup`         | Configure AWS SSO credentials (automatic) |
-| `make check-aws`         | Verify AWS credentials are valid          |
-| `make clean-credentials` | Remove cached credentials (force re-auth) |
+| Command                           | Description                           |
+| --------------------------------- | ------------------------------------- |
+| `make state-list`                 | List all resources in Terraform state |
+| `make state-show RESOURCE=<name>` | Show details of specific resource     |
+| `make workspace-list`             | List all Terraform workspaces         |
+| `make workspace-show`             | Show current workspace                |
 
-### Utility Commands
+### Cleanup Commands
 
-| Command               | Description                      |
-| --------------------- | -------------------------------- |
-| `make validate`       | Validate Terraform configuration |
-| `make fmt`            | Format Terraform files           |
-| `make clean`          | Clean Terraform cache            |
-| `make state-list`     | List resources in state          |
-| `make workspace-list` | List Terraform workspaces        |
+| Command                | Description                                            |
+| ---------------------- | ------------------------------------------------------ |
+| `make clean-terraform` | Remove .terraform, lock files (safe reset)             |
+| `make clean-state`     | Remove local state files (WARNING: local backend only) |
+| `make clean-all`       | Remove all Terraform files (requires confirmation)     |
 
-## AWS Credential Management
+### GitHub Actions Testing (ACT)
 
-The Makefile includes intelligent AWS credential management:
+| Command          | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `make act-plan`  | Test terraform-pr workflow locally with ACT                  |
+| `make act-apply` | Test terraform-apply workflow locally with ACT (use caution) |
 
-### Automatic Features
+## Local Development Workflow
 
-- **Smart Detection**: Checks if credentials exist and are valid
-- **Auto-Authentication**: Runs AWS SSO login only when needed
-- **Credential Caching**: Stores credentials in `.aws-credentials` file
-- **Expiration Handling**: Automatically refreshes expired credentials
-- **Secure Storage**: Credentials file is excluded from git
+The local development setup uses the `scripts/tf-local` wrapper script which handles:
 
-### Manual Credential Management
+- **AWS SSO Authentication**: Automatic session validation and credential export
+- **Workspace Isolation**: Forces `local-dev` workspace to prevent prod accidents
+- **Environment Variables**: Preserves NEON_API_KEY and project variables
+- **Credential Management**: Unsets temporary AWS credentials, exports SSO credentials
 
-If you need to manually manage credentials:
+### Common Commands
 
 ```sh
-# Source the setup script directly (must be sourced, not executed)
-source ../scripts/setup-aws.sh
+# See what infrastructure would be created
+make local-plan
 
-# Or use the Makefile command
-make aws-setup
+# Apply changes to local-dev environment
+make local-apply
 
-# Clear cached credentials to force re-authentication
-make clean-credentials
+# Check current workspace (should show: local-dev)
+make workspace-show
+
+# List all deployed resources
+make state-list
+
+# Show details of a specific resource
+make state-show RESOURCE=module.lambda.aws_lambda_function.backend
+
+# Format Terraform files
+make local-fmt
+
+# Destroy everything in local-dev (start fresh)
+make local-destroy
+```
+
+### Cleanup and Recovery
+
+```sh
+# If Terraform gets stuck or confused
+make clean-terraform  # Removes .terraform directory
+make local-init       # Reinitialize
+
+# Remove all local Terraform files (nuclear option)
+make clean-all
+
+# If you accidentally switch workspaces
+../scripts/tf-local workspace select local-dev
 ```
 
 ## Infrastructure Modules
 
 The infrastructure is organized into reusable modules:
 
-### Available Modules
+### Core Modules (Always Deployed)
 
-- **`lambda`**: Backend API (Python FastAPI)
-- **`api_gateway`**: HTTP API endpoints and routing
-- **`acm`**: SSL/TLS certificates
-- **`route53`**: DNS and domain management
-- **`auth0`**: Authentication integration
+- **`vpc`**: Network infrastructure (VPC, subnets, security groups)
+- **`lambda`**: Backend API function (Python)
+- **`api_gateway`**: REST API endpoints and routing
+- **`cloudfront`**: CDN for frontend and API
+- **`frontend_s3`**: Static website hosting for Svelte frontend
+- **`backend_s3`**: Lambda deployment artifacts storage
+- **`neon`**: Serverless PostgreSQL database (multi-branch per environment)
 
-### Module Status
+### Production-Only Modules (Conditional)
 
-Currently, all modules are commented out in `main.tf` as placeholders. Uncomment and configure modules as you implement each component:
+- **`acm`**: SSL/TLS certificates for CloudFront custom domain
+- **`route53`**: DNS management for tally.kenhoward.dev
 
-```hcl
-# In main.tf, uncomment when ready to implement:
-# module "lambda" {
-#   source = "./modules/lambda"
-#   # Add lambda module variables here
-# }
-```
+## Local Development Workflow
 
-## Development Workflow
-
-### Implementing New Infrastructure
-
-1. **Implement a module** (e.g., `modules/lambda/main.tf`)
-2. **Uncomment the module** in `main.tf`
-3. **Add required variables** and outputs
-4. **Plan and apply** changes:
-   ```sh
-   make plan
-   make apply
-   ```
-
-### Recommended Implementation Order
-
-1. **Lambda**: Core backend functionality
-2. **API Gateway**: HTTP endpoints
-3. **ACM**: SSL certificates
-4. **Route53**: DNS configuration
-5. **Auth0**: Authentication (optional for MVP)
-
-## Configuration Files
-
-| File                   | Purpose                                                    |
 | ---------------------- | ---------------------------------------------------------- |
-| `main.tf`              | Main Terraform configuration                               |
-| `variables_outputs.tf` | Input variables and outputs                                |
-| `Makefile`             | Build automation and AWS integration                       |
-| `.aws-credentials`     | Cached AWS credentials (git-ignored)                       |
-| `modules/*/`           | Reusable infrastructure modules                            |
-| `backend.conf.json`    | S3 backend config for Terraform state (used only in CI/CD) |
+| `main.tf` | Main Terraform configuration |
+| `variables_outputs.tf` | Input variables and outputs |
+| `Makefile` | Build automation and AWS integration |
+| `.aws-credentials` | Cached AWS credentials (git-ignored) |
+| `modules/*/` | Reusable infrastructure modules |
+| `backend.conf.json` | S3 backend config for Terraform state (used only in CI/CD) |
 
 ### S3 Backend Configuration (backend.conf.json)
 

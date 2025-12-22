@@ -7,6 +7,11 @@ variable "lambda_function_arn" {
   type        = string
 }
 
+variable "lambda_function_name" {
+  description = "Name of the Lambda function for API Gateway permissions."
+  type        = string
+}
+
 variable "stage_name" {
   description = "Deployment stage name."
   type        = string

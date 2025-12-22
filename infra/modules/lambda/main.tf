@@ -1,7 +1,7 @@
 # Lambda Module
 # IAM role for Lambda
 resource "aws_iam_role" "lambda_exec" {
-  name = "${var.project}-lambda-exec"
+  name = "${var.project}-${var.environment}-lambda-exec"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -14,7 +14,7 @@ resource "aws_iam_role" "lambda_exec" {
   })
 }
 
-# Attach AWS managed policies for Lambda execution, VPC, S3, and RDS access
+# Attach AWS managed policies for Lambda execution and VPC access
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -30,13 +30,8 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_read" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_rds_access" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonRDSFullAccess"
-}
-
 resource "aws_lambda_function" "backend" {
-  function_name = "${var.project}-backend"
+  function_name = "${var.project}-${var.environment}-backend"
   handler       = "main.handler"
   runtime       = "python3.13"
   s3_bucket     = var.lambda_code_s3_bucket

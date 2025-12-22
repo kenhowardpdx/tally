@@ -8,6 +8,11 @@ variable "project" {
   type        = string
 }
 
+variable "environment" {
+  description = "Environment (dev, prod)"
+  type        = string
+}
+
 variable "vpc_id" {
   description = "VPC ID for Lambda networking"
   type        = string

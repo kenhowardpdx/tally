@@ -58,6 +58,10 @@ list-workflows: ## List all available GitHub workflows
 aws-setup: ## Configure AWS SSO credentials
 	@$(MAKE) -C infra aws-setup
 
+# Frontend deployment
+deploy-frontend: ## Deploy frontend to S3 (environment from .secrets or specify ENVIRONMENT=dev/prod)
+	@./scripts/deploy-frontend.sh ${ENVIRONMENT}
+
 # Pre-commit validation
 pre-commit: ## Run all pre-commit validations
 	@$(MAKE) validate-actions

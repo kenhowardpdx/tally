@@ -18,6 +18,10 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.0"
     }
+    neon = {
+      source  = "kislerdm/neon"
+      version = "~> 0.6"
+    }
   }
 }
 
@@ -35,6 +39,13 @@ provider "aws" {
 
   # Alternatively, use environment variables AWS_PROFILE or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
   # The setup-aws.sh script exports credentials to environment variables
+}
+
+# Neon provider configuration
+# Set NEON_API_KEY environment variable or use provider block with api_key
+provider "neon" {
+  # api_key is read from NEON_API_KEY environment variable
+  # Get your API key from: https://console.neon.tech/app/settings/api-keys
 }
 
 # VPC Module - Zero-Cost Network Foundation
@@ -63,8 +74,9 @@ module "frontend_s3" {
   }
 }
 
-# ACM certificate for CloudFront custom domain
+# ACM certificate for CloudFront custom domain (production only)
 module "acm" {
+  count                     = var.environment == "prod" ? 1 : 0
   source                    = "./modules/acm"
   domain_name               = "tally.kenhoward.dev"
   subject_alternative_names = []
@@ -81,9 +93,10 @@ module "acm" {
 module "cloudfront" {
   source                  = "./modules/cloudfront"
   bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
-  aliases                 = ["tally.kenhoward.dev"]
-  acm_certificate_arn     = module.acm.acm_certificate_arn
-  api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
+  aliases                 = var.environment == "prod" ? ["tally.kenhoward.dev"] : []
+  acm_certificate_arn     = var.environment == "prod" ? module.acm[0].acm_certificate_arn : null
+  api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/${var.environment}", "")
+  api_gateway_stage       = var.environment
   api_path_pattern        = "/api/v1/*"
   tags = {
     Environment = var.environment
@@ -99,72 +112,45 @@ module "lambda" {
   public_subnet_ids        = module.vpc.public_subnet_ids
   lambda_security_group_id = module.vpc.lambda_security_group_id
 
-  project = var.project
+  project     = var.project
+  environment = var.environment
 
-  db_name     = module.rds.rds_db_name
-  db_username = module.rds.rds_username
-  db_password = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_host     = module.rds.rds_endpoint
+  # Neon database connection
+  db_name     = module.neon.database_name
+  db_username = module.neon.database_username
+  db_password = module.neon.database_password
+  db_host     = module.neon.database_host
 
   lambda_code_s3_bucket = module.backend_s3.bucket_name
 }
 
-data "aws_secretsmanager_secret" "rds_password" {
-  name = "prod-rds-postgres-password"
-}
+# Neon Serverless PostgreSQL
+# Free tier: 0.5 GB storage, scales to zero when idle
+# Architecture: One shared project (super-water-91030697) with multiple branches
+module "neon" {
+  source = "./modules/neon"
 
-data "aws_secretsmanager_secret_version" "rds_password_version" {
-  secret_id = data.aws_secretsmanager_secret.rds_password.id
-}
+  environment       = var.environment
+  neon_project_id   = var.neon_project_id
+  db_name           = "${var.project}db"
+  db_username       = "${var.project}admin"
 
-module "rds" {
-  source             = "./modules/rds"
-  db_name            = "${var.project}db"
-  db_username        = "${var.project}admin"
-  db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_subnet_group    = module.vpc.db_subnet_group
-  security_group_ids = [module.vpc.rds_security_group_id]
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "rds"
-  }
-  environment = var.environment
-}
-
-
-module "bastion" {
-  source            = "./modules/bastion"
-  subnet_id         = module.vpc.public_subnet_ids[0]
-  security_group_id = module.vpc.lambda_security_group_id
-  key_name          = "${var.project}-bastion-key-prod" # Project-specific SSH key name
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "bastion"
-  }
+  # Auto-scales to 0.25 CU minimum, suspends after 5 minutes of inactivity
 }
 
 module "api_gateway" {
-  source              = "./modules/api_gateway"
-  lambda_function_arn = module.lambda.backend_lambda_function_arn
-  stage_name          = "prod"
-  api_name            = "tally-api"
-  aws_region          = var.aws_region
+  source               = "./modules/api_gateway"
+  lambda_function_arn  = module.lambda.backend_lambda_function_arn
+  lambda_function_name = module.lambda.backend_lambda_function_name
+  stage_name           = var.environment
+  api_name             = "tally-api"
+  aws_region           = var.aws_region
 }
 
-# module "acm" {
-#   source = "./modules/acm"
-#   # Add acm module variables here
-# }
-
+# Route53 DNS records (production only)
 module "route53" {
+  count                  = var.environment == "prod" ? 1 : 0
   source                 = "./modules/route53"
   cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
   domain_name            = "kenhoward.dev"
 }
-
-# module "auth0" {
-#   source = "./modules/auth0"
-#   # Add auth0 module variables here
-# }

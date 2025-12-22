@@ -8,24 +8,9 @@ output "public_subnet_ids" {
   value       = module.vpc.public_subnet_ids
 }
 
-output "database_subnet_ids" {
-  description = "List of IDs of database subnets (for RDS subnet group)"
-  value       = module.vpc.database_subnet_ids
-}
-
 output "lambda_security_group_id" {
   description = "ID of the Lambda security group"
   value       = module.vpc.lambda_security_group_id
-}
-
-output "rds_security_group_id" {
-  description = "ID of the RDS security group"
-  value       = module.vpc.rds_security_group_id
-}
-
-output "rds_password_secret_arn" {
-  description = "Secrets Manager ARN for RDS password"
-  value       = data.aws_secretsmanager_secret.rds_password.arn
 }
 
 output "cloudfront_domain_name" {
@@ -50,84 +35,66 @@ output "public_route_table_id" {
 
 output "route53_domain_name" {
   description = "Route 53 hosted zone domain name"
-  value       = module.route53.domain_name
+  value       = var.environment == "prod" ? module.route53[0].domain_name : null
 }
 
 output "route53_name_servers" {
   description = "Route 53 hosted zone name servers (for registrar setup)"
-  value       = module.route53.name_servers
+  value       = var.environment == "prod" ? module.route53[0].name_servers : null
 }
 
 output "frontend_s3_website_endpoint" {
   description = "S3 static website endpoint for frontend (should be private if using CloudFront)"
   value       = module.frontend_s3.website_endpoint
 }
-output "db_instance_id" {
-  description = "RDS instance ID"
-  value       = module.rds.rds_instance_id
+
+# Neon Database Outputs
+output "neon_project_id" {
+  description = "Neon project ID"
+  value       = module.neon.project_id
 }
 
-output "db_endpoint" {
-  description = "RDS endpoint"
-  value       = module.rds.rds_endpoint
+output "neon_database_host" {
+  description = "Neon database host endpoint"
+  value       = module.neon.database_host
+  sensitive   = true
 }
 
-output "db_name" {
-  description = "RDS database name"
-  value       = module.rds.rds_db_name
+output "neon_database_name" {
+  description = "Neon database name"
+  value       = module.neon.database_name
 }
 
-output "db_username" {
-  description = "RDS database username"
-  value       = module.rds.rds_username
-}
-
-output "db_port" {
-  description = "RDS port"
-  value       = module.rds.rds_port
-}
-
-output "db_password_secret_arn" {
-  description = "Secrets Manager ARN for RDS password"
-  value       = data.aws_secretsmanager_secret.rds_password.arn
-}
-
-output "db_connection_string" {
-  description = "PostgreSQL connection string (password in Secrets Manager)"
-  value       = "postgresql://${module.rds.rds_username}:[password-from-secrets]@${module.rds.rds_endpoint}:${module.rds.rds_port}/${module.rds.rds_db_name}"
-}
-
-output "bastion_public_ip" {
-  description = "Public IP of bastion host"
-  value       = module.bastion.bastion_public_ip
-}
-
-output "bastion_ssh_username" {
-  description = "SSH username for bastion host"
-  value       = module.bastion.bastion_ssh_username
-}
-
-output "bastion_ssh_key_name" {
-  description = "SSH key name for bastion host"
-  value       = module.bastion.bastion_ssh_key_name
-}
-
-output "bastion_ssh_port" {
-  description = "SSH port for bastion host"
-  value       = module.bastion.bastion_ssh_port
+output "neon_connection_uri" {
+  description = "Neon PostgreSQL connection URI"
+  value       = module.neon.connection_uri
+  sensitive   = true
 }
 
 output "tally_site_url" {
-  description = "Full URL for the static site via CloudFront and custom domain."
-  value       = "https://${var.project}.${var.domain_name}"
+  description = "Full URL for the static site"
+  value       = var.environment == "prod" ? "https://${var.project}.${var.domain_name}" : "https://${module.cloudfront.cloudfront_domain_name}"
 }
 
 output "tally_api_url" {
-  description = "Base URL for the API via CloudFront and custom domain."
-  value       = "https://${var.project}.${var.domain_name}${var.api_endpoint_prefix}"
+  description = "Base URL for the API"
+  value       = var.environment == "prod" ? "https://${var.project}.${var.domain_name}${var.api_endpoint_prefix}" : "https://${module.cloudfront.cloudfront_domain_name}${var.api_endpoint_prefix}"
 }
 
 output "api_gateway_invoke_url" {
-  description = "Direct API Gateway invoke URL (for debugging, not for production use)."
+  description = "Direct API Gateway invoke URL (for debugging)"
   value       = module.api_gateway.invoke_url
+}
+
+# Environment-specific access instructions
+output "access_instructions" {
+  description = "How to access your deployed application"
+  value = var.environment == "prod" ? "Production: Access via https://tally.kenhoward.dev" : <<-EOT
+    Development Environment
+    =======================
+    Frontend: https://${module.cloudfront.cloudfront_domain_name}
+    API:      https://${module.cloudfront.cloudfront_domain_name}${var.api_endpoint_prefix}
+    
+    Note: Using auto-generated CloudFront domain (no custom domain in dev)
+  EOT
 }

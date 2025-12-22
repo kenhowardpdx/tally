@@ -72,6 +72,7 @@ jobs:
             echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
             sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
             terraform init -backend-config=backend.conf.tmp
+            terraform workspace select default || terraform workspace new default
             terraform validate
             set +e  # Allow plan to exit with non-zero codes
             terraform plan -out=tfplan -detailed-exitcode
@@ -89,6 +90,9 @@ jobs:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_neon_org_id: ${{ secrets.NEON_ORG_ID }}
+          TF_VAR_neon_project_id: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
 
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
@@ -101,6 +105,9 @@ jobs:
         env:
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_neon_org_id: ${{ secrets.NEON_ORG_ID }}
+          TF_VAR_neon_project_id: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
 
       - name: Output
         if: success()

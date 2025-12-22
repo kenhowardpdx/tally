@@ -83,9 +83,12 @@ jobs:
             echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
             sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
             terraform init -backend-config=backend.conf.tmp
+            terraform workspace select default || terraform workspace new default
           fi
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_neon_org_id: ${{ secrets.NEON_ORG_ID }}
+          TF_VAR_neon_project_id: ${{ secrets.NEON_PROJECT_ID }}
           AWS_REGION: us-west-2
 
       - name: Check Formatting
@@ -97,6 +100,9 @@ jobs:
         run: terraform validate
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_neon_org_id: ${{ secrets.NEON_ORG_ID }}
+          TF_VAR_neon_project_id: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
 
       - name: Plan
         if: steps.infra_changes.outputs.noop != 'true'
@@ -117,6 +123,7 @@ jobs:
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: us-west-2
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         continue-on-error: true
 
       - name: Comment

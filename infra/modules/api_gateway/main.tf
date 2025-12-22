@@ -38,6 +38,14 @@ resource "aws_api_gateway_integration" "lambda" {
   uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.lambda_function_arn}/invocations"
 }
 
+resource "aws_lambda_permission" "api_gateway" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/*"
+}
+
 resource "aws_api_gateway_deployment" "this" {
   depends_on  = [aws_api_gateway_integration.lambda]
   rest_api_id = aws_api_gateway_rest_api.this.id

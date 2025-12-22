@@ -13,10 +13,11 @@ output "public_subnet_ids" {
   value       = aws_subnet.public[*].id
 }
 
-output "database_subnet_ids" {
-  description = "List of IDs of database subnets (for RDS subnet group)"
-  value       = aws_subnet.database[*].id
-}
+# Database subnets kept for potential future use (zero cost)
+# output "database_subnet_ids" {
+#   description = "List of IDs of database subnets"
+#   value       = aws_subnet.database[*].id
+# }
 
 output "internet_gateway_id" {
   description = "ID of the Internet Gateway"
@@ -28,22 +29,7 @@ output "public_route_table_id" {
   value       = aws_route_table.public.id
 }
 
-output "bastion_security_group_id" {
-  description = "ID of the Bastion security group"
-  value       = aws_security_group.bastion.id
-}
-
 output "lambda_security_group_id" {
   description = "ID of the Lambda security group"
   value       = aws_security_group.lambda.id
-}
-
-output "rds_security_group_id" {
-  description = "ID of the RDS security group"
-  value       = aws_security_group.rds.id
-}
-
-output "db_subnet_group" {
-  description = "RDS DB subnet group name"
-  value       = aws_db_subnet_group.rds.name
 }

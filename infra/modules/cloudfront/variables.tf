@@ -21,6 +21,15 @@ variable "api_gateway_domain_name" {
   default     = null
 }
 
+variable "api_gateway_stage" {
+  description = "API Gateway stage name (dev, prod)"
+  type        = string
+  validation {
+    condition     = contains(["dev", "prod"], var.api_gateway_stage)
+    error_message = "api_gateway_stage must be either 'dev' or 'prod'."
+  }
+}
+
 variable "api_path_pattern" {
   description = "Path pattern for API requests."
   type        = string

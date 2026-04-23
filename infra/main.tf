@@ -130,6 +130,9 @@ module "rds" {
     Purpose     = "rds"
   }
   environment = var.environment
+  # Backups disabled during development (zero cost).
+  # When ready: set backup_retention_period = 7 (or higher, up to 35).
+  # backup_retention_period = 7
 }
 
 

@@ -33,3 +33,9 @@ variable "environment" {
   description = "Environment name"
   type        = string
 }
+
+variable "backup_retention_period" {
+  description = "Number of days to retain automated backups. Set to 0 to disable (zero cost). Increase to 7-35 when ready for production backups."
+  type        = number
+  default     = 0
+}

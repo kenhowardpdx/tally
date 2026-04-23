@@ -12,7 +12,9 @@ resource "aws_db_instance" "main" {
   skip_final_snapshot     = true
   publicly_accessible     = false
   multi_az                = false # Single AZ for lowest cost
-  backup_retention_period = 0     # No backups for zero cost
+  # Set to 0 to disable automated backups (zero cost during development).
+  # Increase to 7-35 days when ready to enable production backups.
+  backup_retention_period = var.backup_retention_period
   deletion_protection     = false
   tags                    = var.tags
 }

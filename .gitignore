@@ -2,6 +2,7 @@
 .env
 *.env
 *.log
+*.tmp
 .DS_Store
 
 # Node.js/Svelte (frontend)

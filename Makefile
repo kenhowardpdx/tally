@@ -1,7 +1,7 @@
 # Tally Project Makefile
 # This Makefile provides common development tasks and GitHub Actions testing
 
-.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-setup clean-terraform
+.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-login aws-creds clean-terraform
 
 # Default target
 help: ## Show this help message
@@ -54,9 +54,12 @@ github_workflow_ci: ## Run the CI workflow
 list-workflows: ## List all available GitHub workflows
 	@ls -1 .github/workflows/*.yml | sed 's|.github/workflows/||' | sed 's|\.yml$$||' | sed 's/^/github_workflow_/'
 
-# AWS Setup
-aws-setup: ## Configure AWS SSO credentials
-	@$(MAKE) -C infra aws-setup
+# AWS Auth
+aws-login: ## Authenticate with AWS SSO (for direct terraform use)
+	@./scripts/aws-auth.sh
+
+aws-creds: ## Authenticate with AWS SSO and export STS credentials for ACT
+	@./scripts/aws-auth.sh --creds
 
 # Pre-commit validation
 pre-commit: ## Run all pre-commit validations

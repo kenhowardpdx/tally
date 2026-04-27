@@ -18,7 +18,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 1. Clone the repo
 2. Install Python dependencies: `poetry install`
-3. Set up AWS credentials: `make -C infra aws-credentials`
+3. Set up AWS credentials: `make aws-login`
 4. Start Docker
 5. Run tests: `make test`
 6. Run workflows locally: `make github_workflow_terraform-pr`
@@ -169,24 +169,18 @@ Create a `.actrc` file in the project root:
 
 #### AWS Credentials Setup
 
-Before running any workflow locally, ensure your `~/.aws/credentials` file is in the correct INI format. Use the Makefile target:
+There are two auth targets depending on what you're doing:
 
-```bash
-make -C infra aws-credentials
-```
+| Target | When to use |
+|--------|-------------|
+| `make aws-login` | Direct terraform use (`terraform plan`, `terraform validate`, etc.) |
+| `make aws-creds` | Before running ACT workflows (`make github_workflow_*`) |
 
-This runs `scripts/export-aws-credentials.sh`, which logs in to AWS SSO using your profile from `.secrets` and exports credentials in the required INI format for Terraform, ACT, and AWS CLI.
+`aws-login` does an SSO login only — Terraform reads the SSO session directly via `AWS_PROFILE`. No credential export needed.
 
-Your `~/.aws/credentials` file should look like:
+`aws-creds` does the same SSO login, then exports static STS credentials to `~/.aws/credentials` and updates the credential vars in `.secrets` (preserving everything else). Run this before ACT since containers can't use SSO.
 
-```ini
-[default]
-aws_access_key_id=...
-aws_secret_access_key=...
-aws_session_token=...
-```
-
-**Run this before any ACT or Makefile workflow targets.**
+**Credentials expire after ~8 hours. Re-run the appropriate target when they do.**
 
 **Manual act usage:**
 
@@ -292,8 +286,11 @@ We've integrated act testing into our Makefile for a streamlined developer exper
 #### Available Targets
 
 ```bash
-# Export AWS credentials to ~/.aws/credentials
-make aws-credentials
+# Authenticate with AWS SSO (for direct terraform)
+make aws-login
+
+# Authenticate + export static credentials (for ACT)
+make aws-creds
 
 # List all available make targets
 make help

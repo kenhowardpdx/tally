@@ -161,7 +161,7 @@ module "api_gateway" {
 module "route53" {
   source                 = "./modules/route53"
   cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
-  domain_name            = "kenhoward.dev"
+  domain_name            = "tally.kenhoward.dev"
 }
 
 # module "auth0" {

@@ -1,7 +1,17 @@
-# Route53 Module
-# Define your Route53 hosted zone and DNS records here
 resource "aws_route53_zone" "this" {
   name = var.domain_name
+}
+
+resource "aws_route53_record" "frontend" {
+  zone_id = aws_route53_zone.this.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = var.cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
 }
 
 output "domain_name" {
@@ -9,15 +19,7 @@ output "domain_name" {
 }
 
 output "name_servers" {
-  description = "Route 53 hosted zone name servers"
+  description = "Add these as NS records in Hover for ${var.domain_name} to delegate the subdomain to Route 53"
   value       = aws_route53_zone.this.name_servers
 }
 
-# DNS record for tally.kenhoward.dev pointing to S3 website endpoint
-resource "aws_route53_record" "frontend" {
-  zone_id = aws_route53_zone.this.zone_id
-  name    = "tally.kenhoward.dev"
-  type    = "CNAME"
-  ttl     = 300
-  records = [var.cloudfront_domain_name]
-}

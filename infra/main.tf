@@ -37,6 +37,10 @@ provider "aws" {
   # The setup-aws.sh script exports credentials to environment variables
 }
 
+locals {
+  frontend_domain = "tally.kenhoward.dev"
+}
+
 # VPC Module - Zero-Cost Network Foundation
 module "vpc" {
   source = "./modules/vpc"
@@ -66,7 +70,7 @@ module "frontend_s3" {
 # ACM certificate for CloudFront custom domain
 module "acm" {
   source                    = "./modules/acm"
-  domain_name               = "tally.kenhoward.dev"
+  domain_name               = local.frontend_domain
   subject_alternative_names = []
   validation_method         = "DNS"
   providers = {
@@ -81,7 +85,7 @@ module "acm" {
 module "cloudfront" {
   source                  = "./modules/cloudfront"
   bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
-  aliases                 = ["tally.kenhoward.dev"]
+  aliases                 = [local.frontend_domain]
   acm_certificate_arn     = module.acm.acm_certificate_arn
   api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
   api_path_pattern        = "/api/v1/*"
@@ -159,9 +163,10 @@ module "api_gateway" {
 # }
 
 module "route53" {
-  source                 = "./modules/route53"
-  cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
-  domain_name            = "kenhoward.dev"
+  source                    = "./modules/route53"
+  cloudfront_domain_name    = module.cloudfront.cloudfront_domain_name
+  cloudfront_hosted_zone_id = module.cloudfront.cloudfront_hosted_zone_id
+  domain_name               = local.frontend_domain
 }
 
 # module "auth0" {

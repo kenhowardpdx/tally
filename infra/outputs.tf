@@ -48,15 +48,6 @@ output "public_route_table_id" {
   value       = module.vpc.public_route_table_id
 }
 
-output "route53_domain_name" {
-  description = "Route 53 hosted zone domain name"
-  value       = module.route53.domain_name
-}
-
-output "route53_name_servers" {
-  description = "Route 53 hosted zone name servers (for registrar setup)"
-  value       = module.route53.name_servers
-}
 
 output "frontend_s3_website_endpoint" {
   description = "S3 static website endpoint for frontend (should be private if using CloudFront)"

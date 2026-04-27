@@ -90,3 +90,8 @@ output "cloudfront_distribution_arn" {
   description = "CloudFront distribution ARN"
   value       = aws_cloudfront_distribution.frontend.arn
 }
+
+output "cloudfront_hosted_zone_id" {
+  description = "CloudFront distribution hosted zone ID for Route 53 alias records"
+  value       = aws_cloudfront_distribution.frontend.hosted_zone_id
+}

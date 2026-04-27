@@ -31,7 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: aws-actions/configure-aws-credentials@v4
-        if: ${{ !env.ACT }}
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: terraform-apply-${{ github.run_id }}
@@ -50,21 +49,16 @@ jobs:
       - name: Validate
         run: |
           [ -n "$TF_VAR_environment" ] || { echo "TF_VAR_environment required"; exit 1; }
-          [[ "$ACT" != "true" ]] && aws sts get-caller-identity >/dev/null
+          aws sts get-caller-identity >/dev/null
           terraform fmt -check -recursive
         env:
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
 
       - name: Init
         run: |
-          echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
           sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
-          if [[ "$ACT" == "true" ]]; then
-            terraform init -backend-config=backend.conf.tmp || echo "Init failed in ACT mode, continuing..."
-          else
-            terraform init -backend-config=backend.conf.tmp
-            terraform validate
-          fi
+          terraform init -backend-config=backend.conf.tmp
+          terraform validate
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
@@ -72,20 +66,16 @@ jobs:
 
       - name: Build & Stage Lambda
         run: |
-          if [[ "$ACT" == "true" ]]; then
-            echo "DRY RUN: Skipping Lambda build"
-          else
-            pip install --target ../backend/dist fastapi uvicorn httpx --quiet
-            cp ../backend/src/main.py ../backend/dist/
-            (cd ../backend/dist && zip -r ../../infra/backend.zip . -q)
-            rm -rf ../backend/dist
+          pip install --target ../backend/dist fastapi uvicorn httpx --quiet
+          cp ../backend/src/main.py ../backend/dist/
+          (cd ../backend/dist && zip -r ../../infra/backend.zip . -q)
+          rm -rf ../backend/dist
 
-            BUCKET="tally-backend-${TF_VAR_environment}-${AWS_ACCOUNT_ID}-us-west-2"
-            terraform apply -auto-approve -target=module.backend_s3 \
-              -var="aws_account_id=${AWS_ACCOUNT_ID}" -var="environment=${TF_VAR_environment}"
-            aws s3 cp backend.zip s3://${BUCKET}/backend.zip
-            rm -f backend.zip
-          fi
+          BUCKET="tally-backend-${TF_VAR_environment}-${AWS_ACCOUNT_ID}-us-west-2"
+          terraform apply -auto-approve -target=module.backend_s3 \
+            -var="aws_account_id=${AWS_ACCOUNT_ID}" -var="environment=${TF_VAR_environment}"
+          aws s3 cp backend.zip s3://${BUCKET}/backend.zip
+          rm -f backend.zip
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
@@ -94,18 +84,13 @@ jobs:
       - name: Plan
         id: plan
         run: |
-          if [[ "$ACT" == "true" ]]; then
-            echo "plan_exit_code=2" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            set +e
-            terraform plan -out=tfplan -detailed-exitcode
-            plan_exit_code=$?
-            set -e
-            echo "plan_exit_code=$plan_exit_code" >> $GITHUB_OUTPUT
-            echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
-            [[ $plan_exit_code -eq 1 ]] && exit 1 || exit 0
-          fi
+          set +e
+          terraform plan -out=tfplan -detailed-exitcode
+          plan_exit_code=$?
+          set -e
+          echo "plan_exit_code=$plan_exit_code" >> $GITHUB_OUTPUT
+          echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          [[ $plan_exit_code -eq 1 ]] && exit 1 || exit 0
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
@@ -113,12 +98,7 @@ jobs:
 
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
-        run: |
-          if [[ "$ACT" == "true" ]]; then
-            echo "DRY RUN: Would apply changes (exit code: ${{ steps.plan.outputs.plan_exit_code }})"
-          else
-            terraform apply -auto-approve tfplan
-          fi
+        run: terraform apply -auto-approve tfplan
         env:
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -126,9 +106,7 @@ jobs:
       - name: Output
         if: success()
         run: |
-          if [[ "$ACT" == "true" ]]; then
-            echo "ACT test complete (exit: ${{ steps.plan.outputs.plan_exit_code }}, changes: ${{ steps.plan.outputs.has_changes }})"
-          elif [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
+          if [[ "${{ steps.plan.outputs.has_changes }}" == "true" ]]; then
             echo "Applied $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
             terraform output 2>/dev/null || echo "No outputs"
           else

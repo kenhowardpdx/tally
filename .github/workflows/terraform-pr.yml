@@ -37,30 +37,11 @@ jobs:
         if: steps.infra_changes.outputs.noop == 'true'
         run: echo "No infra changes detected. Skipping Terraform steps."
 
-      - name: Configure AWS credentials
-        if: steps.infra_changes.outputs.noop != 'true'
-        run: |
-          if [ "$ACT" = "true" ]; then
-            echo "Configuring AWS credentials for ACT/local run."
-            env | grep AWS_
-          else
-            echo "Configuring AWS credentials for CI/CD run."
-          fi
-
       - uses: aws-actions/configure-aws-credentials@v4
         if: steps.infra_changes.outputs.noop != 'true'
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
-
-      - name: Configure AWS credentials for ACT/local
-        if: steps.infra_changes.outputs.noop != 'true' && env.ACT == 'true'
-        run: |
-          echo "Configuring AWS credentials for ACT/local run."
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-          export AWS_REGION=us-west-2
 
       - uses: hashicorp/setup-terraform@v3
         if: steps.infra_changes.outputs.noop != 'true'
@@ -76,17 +57,10 @@ jobs:
       - name: Init
         if: steps.infra_changes.outputs.noop != 'true'
         run: |
-          if [ "$ACT" = "true" ]; then
-            echo 'Using local backend for ACT run.'
-            make init-local
-          else
-            echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
-            sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
-            terraform init -backend-config=backend.conf.tmp
-          fi
+          sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
+          terraform init -backend-config=backend.conf.tmp
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: us-west-2
 
       - name: Check Formatting
         if: steps.infra_changes.outputs.noop != 'true'
@@ -102,25 +76,15 @@ jobs:
         if: steps.infra_changes.outputs.noop != 'true'
         id: plan
         run: |
-          # Clean up backend config for ACT/local run
-          if [ "$ACT" = "true" ]; then
-            echo 'Using local backend for ACT run.'
-            make init-local
-          else
-            echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
-            sed "s/__AWS_ACCOUNT_ID__/$TF_VAR_aws_account_id/g" backend.conf > backend.conf.tmp
-            terraform init -backend-config=backend.conf.tmp
-          fi
           terraform plan -no-color -out=tfplan 2>&1 | tee tfplan.txt
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: us-west-2
         continue-on-error: true
 
       - name: Comment
-        if: github.event_name == 'pull_request' && !env.ACT && steps.plan.outputs.exit_code != '0'
+        if: github.event_name == 'pull_request' && steps.plan.outputs.exit_code != '0'
         uses: actions/github-script@v7
         with:
           script: |
@@ -132,7 +96,7 @@ jobs:
               plan = 'No plan output';
             }
             const exitCode = '${{ steps.plan.outputs.exit_code }}';
-            const status = exitCode === '0' ? '✅ No changes' : 
+            const status = exitCode === '0' ? '✅ No changes' :
                           exitCode === '2' ? '📋 Changes detected' : '❌ Failed';
 
             const output = `#### Terraform Plan ${status}
@@ -149,7 +113,7 @@ jobs:
               repo: context.repo.repo,
             });
 
-            const existing = comments.data.find(c => 
+            const existing = comments.data.find(c =>
               c.user.type === 'Bot' && c.body.includes('Terraform Plan')
             );
 
@@ -168,13 +132,6 @@ jobs:
                 body: output
               });
             }
-
-      - name: Local Output
-        run: |
-          if [ "$ACT" = "true" ]; then
-            echo "Exit code: ${{ steps.plan.outputs.exit_code }}"
-            cat tfplan.txt 2>/dev/null || echo "No plan output"
-          fi
 
       - name: Fail Check
         if: steps.plan.outputs.exit_code == '1'

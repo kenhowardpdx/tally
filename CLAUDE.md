@@ -103,7 +103,6 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 - Use Docker Compose for local development environment
 - **Use `.secrets` file** for local sensitive configuration (never commit this file)
-- Test GitHub Actions locally using `act` (use Makefile targets like `make github_workflow_terraform-pr`)
 - Validate Terraform changes locally before committing
 - Run tests before pushing changes
 - **Always check costs**: Use `terraform plan` and AWS cost calculators before deploying resources
@@ -124,7 +123,7 @@ Source it in your shell:
 
 ```bash
 source .secrets
-make github_workflow_terraform-pr  # Now has access to AWS credentials
+make plan  # Now has access to AWS credentials
 ```
 
 ### Testing
@@ -371,7 +370,6 @@ logger.error("Error processing request", exc_info=True)
 
 - Terraform: Infrastructure as Code
 - AWS CLI: AWS operations
-- act: Local GitHub Actions testing
 - Docker: Containerization
 
 ## Documentation Requirements
@@ -489,8 +487,7 @@ logger.error("Error processing request", exc_info=True)
 
 - Validates Terraform on PRs affecting `infra/`
 - Posts plan results as PR comments
-- Supports both GitHub Actions and local `act` testing
-- **~110 lines** - comprehensive validation with PR feedback
+- **~80 lines** - comprehensive validation with PR feedback
 
 #### terraform-apply.yml
 
@@ -499,7 +496,7 @@ logger.error("Error processing request", exc_info=True)
 - Includes concurrency controls and conditional execution
 - **~60 lines** - production-ready deployment
 
-Use `make github_workflow_terraform-pr` to test workflows locally before pushing.
+
 
 ### Required Status Checks
 

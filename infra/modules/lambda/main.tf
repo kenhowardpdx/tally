@@ -40,7 +40,7 @@ resource "aws_lambda_function" "backend" {
   handler       = "main.handler"
   runtime       = "python3.13"
   s3_bucket     = var.lambda_code_s3_bucket
-  s3_key        = "backend"
+  s3_key        = "backend.zip"
   role          = aws_iam_role.lambda_exec.arn
 
   vpc_config {

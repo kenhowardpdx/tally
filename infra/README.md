@@ -106,11 +106,11 @@ make destroy
 
 ### AWS Credential Management
 
-| Command                  | Description                               |
-| ------------------------ | ----------------------------------------- |
-| `make aws-setup`         | Configure AWS SSO credentials (automatic) |
-| `make check-aws`         | Verify AWS credentials are valid          |
-| `make clean-credentials` | Remove cached credentials (force re-auth) |
+| Command          | Description                                       |
+| ---------------- | ------------------------------------------------- |
+| `make aws-login` | SSO login (for direct terraform use)              |
+| `make aws-creds` | SSO login + export STS credentials (for ACT)      |
+| `make check-aws` | Verify AWS credentials are valid                  |
 
 ### Utility Commands
 
@@ -124,30 +124,12 @@ make destroy
 
 ## AWS Credential Management
 
-The Makefile includes intelligent AWS credential management:
+Auth is handled by `scripts/aws-auth.sh` via two Makefile targets:
 
-### Automatic Features
+- **`make aws-login`** — SSO login only. Use this before running `terraform plan` or any direct terraform commands. Terraform reads the SSO session via `AWS_PROFILE` — no credential export needed.
+- **`make aws-creds`** — SSO login + exports static STS credentials to `~/.aws/credentials` and updates the credential vars in `.secrets`. Use this before running ACT workflows, since containers can't use SSO.
 
-- **Smart Detection**: Checks if credentials exist and are valid
-- **Auto-Authentication**: Runs AWS SSO login only when needed
-- **Credential Caching**: Stores credentials in `.aws-credentials` file
-- **Expiration Handling**: Automatically refreshes expired credentials
-- **Secure Storage**: Credentials file is excluded from git
-
-### Manual Credential Management
-
-If you need to manually manage credentials:
-
-```sh
-# Source the setup script directly (must be sourced, not executed)
-source ../scripts/setup-aws.sh
-
-# Or use the Makefile command
-make aws-setup
-
-# Clear cached credentials to force re-authentication
-make clean-credentials
-```
+Credentials expire after ~8 hours. Re-run the appropriate target when they do.
 
 ## Infrastructure Modules
 
@@ -257,9 +239,11 @@ make workspace-list
 **AWS Credentials Not Working**
 
 ```sh
-# Clear cached credentials and re-authenticate
-make clean-credentials
-make aws-setup
+# Re-authenticate (for direct terraform)
+make aws-login
+
+# Or, if running ACT workflows
+make aws-creds
 ```
 
 **Terraform Init Fails**

@@ -19,7 +19,7 @@ output "domain_name" {
 }
 
 output "name_servers" {
-  description = "Add these as NS records in Hover for ${var.domain_name} to delegate the subdomain to Route 53"
+  description = "Add these as NS records in Hover for the subdomain to delegate DNS to Route 53"
   value       = aws_route53_zone.this.name_servers
 }
 

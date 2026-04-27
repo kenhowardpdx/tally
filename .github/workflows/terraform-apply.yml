@@ -57,7 +57,6 @@ jobs:
 
       - name: Init
         run: |
-          echo -e "terraform {\n  backend \"s3\" {}\n}" > backend.tf
           sed "s/__AWS_ACCOUNT_ID__/$AWS_ACCOUNT_ID/g" backend.conf > backend.conf.tmp
           if [[ "$ACT" == "true" ]]; then
             terraform init -backend-config=backend.conf.tmp || echo "Init failed in ACT mode, continuing..."

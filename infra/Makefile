@@ -3,7 +3,7 @@
 # This prevents accidental infrastructure changes and unexpected AWS charges.
 # For real deployments, use GitHub Actions workflows only.
 
-.PHONY: help aws-login aws-creds act-plan act-apply init init-local plan show apply validate destroy clean clean-terraform fmt check check-aws setup-aws-credentials workspace-list workspace-new workspace-select state-list state-show dev-setup ci-check
+.PHONY: help aws-login aws-creds act-plan act-apply create-rds-secret init init-local plan show apply validate destroy clean clean-terraform fmt check check-aws setup-aws-credentials workspace-list workspace-new workspace-select state-list state-show dev-setup ci-check
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +40,20 @@ act-apply: ## Run GitHub Actions workflow (terraform-apply) with AWS creds
 		--env TF_VAR_aws_account_id=$$TF_VAR_aws_account_id \
 		--env TF_VAR_aws_profile=$$TF_VAR_aws_profile \
 		-v $$HOME/.aws:/root/.aws)
+
+# Secrets
+create-rds-secret: ## Create RDS password secret in Secrets Manager (no-op if it already exists)
+	@if aws secretsmanager describe-secret --secret-id prod-rds-postgres-password >/dev/null 2>&1; then \
+		echo "✅ Secret 'prod-rds-postgres-password' already exists, skipping."; \
+	else \
+		password=$$(openssl rand -base64 32 | tr -d '/+='); \
+		arn=$$(aws secretsmanager create-secret \
+			--name prod-rds-postgres-password \
+			--description "RDS PostgreSQL password for Tally prod" \
+			--secret-string "$$password" \
+			--query ARN --output text) && \
+		echo "✅ Secret created: $$arn"; \
+	fi
 
 # Terraform
 init: ## Initialize Terraform with S3 backend (CI/remote only)

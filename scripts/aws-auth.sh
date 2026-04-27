@@ -37,11 +37,11 @@ fi
 
 echo "Exporting STS credentials..."
 
-CREDS=$(aws configure export-credentials --profile "$AWS_PROFILE" --format json)
-KEY=$(echo "$CREDS" | jq -r '.AccessKeyId')
-SECRET=$(echo "$CREDS" | jq -r '.SecretAccessKey')
-TOKEN=$(echo "$CREDS" | jq -r '.SessionToken')
-EXPIRY=$(echo "$CREDS" | jq -r '.Expiration')
+CREDS=$(aws configure export-credentials --profile "$AWS_PROFILE" --format env-no-export)
+KEY=$(echo "$CREDS" | grep '^AWS_ACCESS_KEY_ID=' | cut -d'=' -f2)
+SECRET=$(echo "$CREDS" | grep '^AWS_SECRET_ACCESS_KEY=' | cut -d'=' -f2)
+TOKEN=$(echo "$CREDS" | grep '^AWS_SESSION_TOKEN=' | cut -d'=' -f2)
+EXPIRY=$(echo "$CREDS" | grep '^AWS_CREDENTIAL_EXPIRATION=' | cut -d'=' -f2)
 
 # Update ~/.aws/credentials [default] section
 {

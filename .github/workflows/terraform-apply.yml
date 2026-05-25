@@ -80,8 +80,6 @@ jobs:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
-          TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
-          TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
 
       - name: Plan
         id: plan

@@ -26,11 +26,11 @@ variable "lambda_security_group_id" {
 variable "database_url_readwrite" {
   description = "Neon PostgreSQL read-write connection string"
   type        = string
-  default     = ""
+  sensitive   = true
 }
 
 variable "database_url_readonly" {
   description = "Neon PostgreSQL read-only connection string"
   type        = string
-  default     = ""
+  sensitive   = true
 }

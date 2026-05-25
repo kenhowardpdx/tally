@@ -105,7 +105,8 @@ module "lambda" {
 
   project = var.project
 
-  database_url = var.database_url
+  database_url_readwrite = var.database_url_readwrite
+  database_url_readonly  = var.database_url_readonly
 
   lambda_code_s3_bucket = module.backend_s3.bucket_name
 }

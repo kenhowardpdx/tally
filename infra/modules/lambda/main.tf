@@ -46,7 +46,8 @@ resource "aws_lambda_function" "backend" {
 
   environment {
     variables = {
-      DATABASE_URL = var.database_url
+      DATABASE_URL_READWRITE = var.database_url_readwrite
+      DATABASE_URL_READONLY  = var.database_url_readonly
     }
   }
 }

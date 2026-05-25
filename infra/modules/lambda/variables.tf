@@ -23,8 +23,14 @@ variable "lambda_security_group_id" {
   type        = string
 }
 
-variable "database_url" {
-  description = "Database connection URL for the backend (e.g. Neon PostgreSQL connection string)"
+variable "database_url_readwrite" {
+  description = "Neon PostgreSQL read-write connection string"
+  type        = string
+  default     = ""
+}
+
+variable "database_url_readonly" {
+  description = "Neon PostgreSQL read-only connection string"
   type        = string
   default     = ""
 }

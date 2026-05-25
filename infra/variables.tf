@@ -45,9 +45,16 @@ variable "environment" {
   # GitHub Actions: Uses workflow inputs or defaults to production
 }
 
-variable "database_url" {
-  description = "Neon PostgreSQL connection string for the backend Lambda"
+variable "database_url_readwrite" {
+  description = "Neon PostgreSQL read-write connection string for the backend Lambda"
   type        = string
   default     = ""
-  # Set via TF_VAR_database_url or GitHub Actions secret
+  # Set via TF_VAR_database_url_readwrite or GitHub Actions secret TALLY_DATABASE_URL_READWRITE
+}
+
+variable "database_url_readonly" {
+  description = "Neon PostgreSQL read-only connection string for the backend Lambda"
+  type        = string
+  default     = ""
+  # Set via TF_VAR_database_url_readonly or GitHub Actions secret TALLY_DATABASE_URL_READONLY
 }

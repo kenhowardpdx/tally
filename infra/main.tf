@@ -41,18 +41,6 @@ locals {
   frontend_domain = "tally.kenhoward.dev"
 }
 
-# VPC Module - Zero-Cost Network Foundation
-module "vpc" {
-  source = "./modules/vpc"
-
-  vpc_cidr           = "10.0.0.0/20"
-  environment        = var.environment
-  project            = var.project
-  availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
-
-  # NAT Gateway disabled for zero-cost architecture
-  # Lambda functions will run in public subnets with security groups
-}
 
 module "frontend_s3" {
   source                      = "./modules/frontend_s3"
@@ -98,11 +86,7 @@ module "cloudfront" {
 }
 
 module "lambda" {
-  source                   = "./modules/lambda"
-  vpc_id                   = module.vpc.vpc_id
-  public_subnet_ids        = module.vpc.public_subnet_ids
-  lambda_security_group_id = module.vpc.lambda_security_group_id
-
+  source  = "./modules/lambda"
   project = var.project
 
   database_url_readwrite = var.database_url_readwrite
@@ -111,18 +95,6 @@ module "lambda" {
   lambda_code_s3_bucket = module.backend_s3.bucket_name
 }
 
-
-module "bastion" {
-  source            = "./modules/bastion"
-  subnet_id         = module.vpc.public_subnet_ids[0]
-  security_group_id = module.vpc.lambda_security_group_id
-  key_name          = "${var.project}-bastion-key-prod" # Project-specific SSH key name
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "bastion"
-  }
-}
 
 module "api_gateway" {
   source              = "./modules/api_gateway"

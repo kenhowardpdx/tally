@@ -14,16 +14,12 @@ resource "aws_iam_role" "lambda_exec" {
   })
 }
 
-# Attach AWS managed policies for Lambda execution, VPC, S3, and RDS access
+# Attach AWS managed policies for Lambda execution and S3 access
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
 
 resource "aws_iam_role_policy_attachment" "lambda_s3_read" {
   role       = aws_iam_role.lambda_exec.name
@@ -38,11 +34,6 @@ resource "aws_lambda_function" "backend" {
   s3_bucket     = var.lambda_code_s3_bucket
   s3_key        = "backend.zip"
   role          = aws_iam_role.lambda_exec.arn
-
-  vpc_config {
-    subnet_ids         = var.public_subnet_ids
-    security_group_ids = [var.lambda_security_group_id]
-  }
 
   environment {
     variables = {

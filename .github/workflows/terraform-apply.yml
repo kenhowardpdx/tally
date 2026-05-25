@@ -21,6 +21,7 @@ concurrency:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'prod' }}
     permissions:
       contents: read
       id-token: write

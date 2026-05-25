@@ -45,7 +45,9 @@ resource "aws_subnet" "public" {
 }
 
 # NOTE: NAT Gateway and Elastic IP removed for zero-cost architecture
-# Lambda functions will run in public subnets with security groups for protection
+# VPC-attached Lambda functions do not gain internet egress simply by running in
+# public subnets. Workloads that must reach external services (for example Neon)
+# need NAT or another egress path, or should not be attached to this VPC.
 
 # Public Route Table
 resource "aws_route_table" "public" {

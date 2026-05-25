@@ -48,13 +48,13 @@ variable "environment" {
 variable "database_url_readwrite" {
   description = "Neon PostgreSQL read-write connection string for the backend Lambda"
   type        = string
-  default     = ""
+  sensitive   = true
   # Set via TF_VAR_database_url_readwrite or GitHub Actions secret TALLY_DATABASE_URL_READWRITE
 }
 
 variable "database_url_readonly" {
   description = "Neon PostgreSQL read-only connection string for the backend Lambda"
   type        = string
-  default     = ""
+  sensitive   = true
   # Set via TF_VAR_database_url_readonly or GitHub Actions secret TALLY_DATABASE_URL_READONLY
 }

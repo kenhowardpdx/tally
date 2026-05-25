@@ -50,6 +50,11 @@ variable "database_url_readwrite" {
   type        = string
   sensitive   = true
   # Set via TF_VAR_database_url_readwrite or GitHub Actions secret TALLY_DATABASE_URL_READWRITE
+
+  validation {
+    condition     = length(var.database_url_readwrite) > 0
+    error_message = "database_url_readwrite must not be empty."
+  }
 }
 
 variable "database_url_readonly" {
@@ -57,4 +62,9 @@ variable "database_url_readonly" {
   type        = string
   sensitive   = true
   # Set via TF_VAR_database_url_readonly or GitHub Actions secret TALLY_DATABASE_URL_READONLY
+
+  validation {
+    condition     = length(var.database_url_readonly) > 0
+    error_message = "database_url_readonly must not be empty."
+  }
 }

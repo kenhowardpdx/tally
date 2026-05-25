@@ -21,6 +21,7 @@ concurrency:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
     permissions:
       contents: read
       id-token: write
@@ -52,7 +53,7 @@ jobs:
           aws sts get-caller-identity >/dev/null
           terraform fmt -check -recursive
         env:
-          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
 
       - name: Init
         run: |
@@ -61,7 +62,7 @@ jobs:
           terraform validate
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: Build & Stage Lambda
@@ -78,7 +79,7 @@ jobs:
           rm -f backend.zip
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
@@ -101,7 +102,7 @@ jobs:
           esac
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
@@ -110,7 +111,7 @@ jobs:
         if: steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
         run: terraform apply -auto-approve tfplan
         env:
-          TF_VAR_environment: ${{ inputs.environment || 'prod' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}

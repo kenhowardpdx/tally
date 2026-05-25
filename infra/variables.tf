@@ -44,3 +44,10 @@ variable "environment" {
   # Set via environment variable TF_VAR_environment
   # GitHub Actions: Uses workflow inputs or defaults to production
 }
+
+variable "database_url" {
+  description = "Neon PostgreSQL connection string for the backend Lambda"
+  type        = string
+  default     = ""
+  # Set via TF_VAR_database_url or GitHub Actions secret
+}

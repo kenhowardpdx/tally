@@ -23,22 +23,8 @@ variable "lambda_security_group_id" {
   type        = string
 }
 
-variable "db_name" {
-  description = "Database name for backend connection"
+variable "database_url" {
+  description = "Database connection URL for the backend (e.g. Neon PostgreSQL connection string)"
   type        = string
-}
-
-variable "db_username" {
-  description = "Database username for backend connection"
-  type        = string
-}
-
-variable "db_password" {
-  description = "Database password for backend connection"
-  type        = string
-}
-
-variable "db_host" {
-  description = "Database host for backend connection"
-  type        = string
+  default     = ""
 }

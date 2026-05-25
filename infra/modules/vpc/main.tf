@@ -44,22 +44,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Database Subnets (for RDS subnet group - still free!)
-resource "aws_subnet" "database" {
-  count = length(var.availability_zones)
-
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 4, count.index + 2)
-  availability_zone = var.availability_zones[count.index]
-
-  tags = {
-    Name        = "${var.project}-${var.environment}-database-${var.availability_zones[count.index]}"
-    Environment = var.environment
-    Project     = var.project
-    Type        = "database"
-  }
-}
-
 # NOTE: NAT Gateway and Elastic IP removed for zero-cost architecture
 # Lambda functions will run in public subnets with security groups for protection
 
@@ -88,14 +72,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Database Route Table (shares public routing - still free!)
-resource "aws_route_table_association" "database" {
-  count = length(var.availability_zones)
-
-  subnet_id      = aws_subnet.database[count.index].id
-  route_table_id = aws_route_table.public.id
-}
-
 # Lambda Security Group
 resource "aws_security_group" "lambda" {
   name_prefix = "${var.project}-${var.environment}-lambda-"
@@ -117,43 +93,6 @@ resource "aws_security_group" "lambda" {
     Environment = var.environment
     Project     = var.project
     Purpose     = "lambda"
-  }
-}
-
-# RDS Subnet Group (for use by RDS instance)
-resource "aws_db_subnet_group" "rds" {
-  name       = "${var.project}-db-subnet-group"
-  subnet_ids = aws_subnet.database[*].id
-  tags = {
-    Name        = "${var.project}-${var.environment}-db-subnet-group"
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "rds"
-  }
-  description = "Database subnet group for RDS"
-}
-
-# RDS Security Group
-resource "aws_security_group" "rds" {
-  name_prefix = "${var.project}-${var.environment}-rds-"
-  vpc_id      = aws_vpc.main.id
-
-  description = "Security group for RDS database"
-
-  # Inbound from Lambda (PostgreSQL)
-  ingress {
-    description     = "PostgreSQL from Lambda"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
-
-  tags = {
-    Name        = "${var.project}-${var.environment}-rds-sg"
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "rds"
   }
 }
 

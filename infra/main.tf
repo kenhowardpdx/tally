@@ -105,35 +105,9 @@ module "lambda" {
 
   project = var.project
 
-  db_name     = module.rds.rds_db_name
-  db_username = module.rds.rds_username
-  db_password = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_host     = module.rds.rds_endpoint
+  database_url = var.database_url
 
   lambda_code_s3_bucket = module.backend_s3.bucket_name
-}
-
-data "aws_secretsmanager_secret" "rds_password" {
-  name = "prod-rds-postgres-password"
-}
-
-data "aws_secretsmanager_secret_version" "rds_password_version" {
-  secret_id = data.aws_secretsmanager_secret.rds_password.id
-}
-
-module "rds" {
-  source             = "./modules/rds"
-  db_name            = "${var.project}db"
-  db_username        = "${var.project}admin"
-  db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_subnet_group    = module.vpc.db_subnet_group
-  security_group_ids = [module.vpc.rds_security_group_id]
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "rds"
-  }
-  environment = var.environment
 }
 
 

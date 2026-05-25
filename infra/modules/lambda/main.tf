@@ -30,10 +30,6 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_read" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_rds_access" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonRDSFullAccess"
-}
 
 resource "aws_lambda_function" "backend" {
   function_name = "${var.project}-backend"
@@ -50,10 +46,7 @@ resource "aws_lambda_function" "backend" {
 
   environment {
     variables = {
-      DB_NAME     = var.db_name
-      DB_USERNAME = var.db_username
-      DB_PASSWORD = var.db_password
-      DB_HOST     = var.db_host
+      DATABASE_URL = var.database_url
     }
   }
 }

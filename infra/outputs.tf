@@ -8,24 +8,9 @@ output "public_subnet_ids" {
   value       = module.vpc.public_subnet_ids
 }
 
-output "database_subnet_ids" {
-  description = "List of IDs of database subnets (for RDS subnet group)"
-  value       = module.vpc.database_subnet_ids
-}
-
 output "lambda_security_group_id" {
   description = "ID of the Lambda security group"
   value       = module.vpc.lambda_security_group_id
-}
-
-output "rds_security_group_id" {
-  description = "ID of the RDS security group"
-  value       = module.vpc.rds_security_group_id
-}
-
-output "rds_password_secret_arn" {
-  description = "Secrets Manager ARN for RDS password"
-  value       = data.aws_secretsmanager_secret.rds_password.arn
 }
 
 output "cloudfront_domain_name" {
@@ -48,44 +33,9 @@ output "public_route_table_id" {
   value       = module.vpc.public_route_table_id
 }
 
-
 output "frontend_s3_website_endpoint" {
   description = "S3 static website endpoint for frontend (should be private if using CloudFront)"
   value       = module.frontend_s3.website_endpoint
-}
-output "db_instance_id" {
-  description = "RDS instance ID"
-  value       = module.rds.rds_instance_id
-}
-
-output "db_endpoint" {
-  description = "RDS endpoint"
-  value       = module.rds.rds_endpoint
-}
-
-output "db_name" {
-  description = "RDS database name"
-  value       = module.rds.rds_db_name
-}
-
-output "db_username" {
-  description = "RDS database username"
-  value       = module.rds.rds_username
-}
-
-output "db_port" {
-  description = "RDS port"
-  value       = module.rds.rds_port
-}
-
-output "db_password_secret_arn" {
-  description = "Secrets Manager ARN for RDS password"
-  value       = data.aws_secretsmanager_secret.rds_password.arn
-}
-
-output "db_connection_string" {
-  description = "PostgreSQL connection string (password in Secrets Manager)"
-  value       = "postgresql://${module.rds.rds_username}:[password-from-secrets]@${module.rds.rds_endpoint}:${module.rds.rds_port}/${module.rds.rds_db_name}"
 }
 
 output "bastion_public_ip" {

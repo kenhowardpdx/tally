@@ -41,18 +41,6 @@ locals {
   frontend_domain = "tally.kenhoward.dev"
 }
 
-# VPC Module - Zero-Cost Network Foundation
-module "vpc" {
-  source = "./modules/vpc"
-
-  vpc_cidr           = "10.0.0.0/20"
-  environment        = var.environment
-  project            = var.project
-  availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
-
-  # NAT Gateway disabled for zero-cost architecture
-  # Lambda functions will run in public subnets with security groups
-}
 
 module "frontend_s3" {
   source                      = "./modules/frontend_s3"
@@ -98,56 +86,15 @@ module "cloudfront" {
 }
 
 module "lambda" {
-  source                   = "./modules/lambda"
-  vpc_id                   = module.vpc.vpc_id
-  public_subnet_ids        = module.vpc.public_subnet_ids
-  lambda_security_group_id = module.vpc.lambda_security_group_id
-
+  source  = "./modules/lambda"
   project = var.project
 
-  db_name     = module.rds.rds_db_name
-  db_username = module.rds.rds_username
-  db_password = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_host     = module.rds.rds_endpoint
+  database_url_readwrite = var.database_url_readwrite
+  database_url_readonly  = var.database_url_readonly
 
   lambda_code_s3_bucket = module.backend_s3.bucket_name
 }
 
-data "aws_secretsmanager_secret" "rds_password" {
-  name = "prod-rds-postgres-password"
-}
-
-data "aws_secretsmanager_secret_version" "rds_password_version" {
-  secret_id = data.aws_secretsmanager_secret.rds_password.id
-}
-
-module "rds" {
-  source             = "./modules/rds"
-  db_name            = "${var.project}db"
-  db_username        = "${var.project}admin"
-  db_password        = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
-  db_subnet_group    = module.vpc.db_subnet_group
-  security_group_ids = [module.vpc.rds_security_group_id]
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "rds"
-  }
-  environment = var.environment
-}
-
-
-module "bastion" {
-  source            = "./modules/bastion"
-  subnet_id         = module.vpc.public_subnet_ids[0]
-  security_group_id = module.vpc.lambda_security_group_id
-  key_name          = "${var.project}-bastion-key-prod" # Project-specific SSH key name
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Purpose     = "bastion"
-  }
-}
 
 module "api_gateway" {
   source              = "./modules/api_gateway"

@@ -44,3 +44,27 @@ variable "environment" {
   # Set via environment variable TF_VAR_environment
   # GitHub Actions: Uses workflow inputs or defaults to production
 }
+
+variable "database_url_readwrite" {
+  description = "Neon PostgreSQL read-write connection string for the backend Lambda"
+  type        = string
+  sensitive   = true
+  # Set via TF_VAR_database_url_readwrite or GitHub Actions secret TALLY_DATABASE_URL_READWRITE
+
+  validation {
+    condition     = length(var.database_url_readwrite) > 0
+    error_message = "database_url_readwrite must not be empty."
+  }
+}
+
+variable "database_url_readonly" {
+  description = "Neon PostgreSQL read-only connection string for the backend Lambda"
+  type        = string
+  sensitive   = true
+  # Set via TF_VAR_database_url_readonly or GitHub Actions secret TALLY_DATABASE_URL_READONLY
+
+  validation {
+    condition     = length(var.database_url_readonly) > 0
+    error_message = "database_url_readonly must not be empty."
+  }
+}

@@ -90,9 +90,15 @@ jobs:
           terraform plan -out=tfplan -detailed-exitcode
           plan_exit_code=$?
           set -e
-          echo "plan_exit_code=$plan_exit_code" >> $GITHUB_OUTPUT
-          echo "has_changes=$([[ $plan_exit_code -eq 2 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
-          [[ $plan_exit_code -eq 1 ]] && exit 1 || exit 0
+
+          echo "plan_exit_code=$plan_exit_code" >> "$GITHUB_OUTPUT"
+
+          case "$plan_exit_code" in
+            0) echo "has_changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "has_changes=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "Terraform plan failed" >&2; exit 1 ;;
+            *) echo "Unexpected exit code: $plan_exit_code" >&2; exit 1 ;;
+          esac
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment || 'prod' }}

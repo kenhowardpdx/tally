@@ -75,8 +75,8 @@ module "cloudfront" {
   bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
   aliases                 = [local.frontend_domain]
   acm_certificate_arn     = module.acm.acm_certificate_arn
-  api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
-  api_origin_path         = "/${split("/", module.api_gateway.invoke_url)[3]}"
+  api_gateway_domain_name = split("/", replace(module.api_gateway.invoke_url, "https://", ""))[0]
+  api_origin_path         = "/${var.environment}"
   api_path_pattern        = "/api/v1/*"
   tags = {
     Environment = var.environment

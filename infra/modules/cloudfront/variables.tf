@@ -27,6 +27,12 @@ variable "api_path_pattern" {
   default     = "/api/v1/*"
 }
 
+variable "api_origin_path" {
+  description = "Path CloudFront prepends when forwarding to the API Gateway origin (e.g., /prod), since the origin's execute-api domain alone omits the stage."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to CloudFront resources."
   type        = map(string)

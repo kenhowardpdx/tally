@@ -76,6 +76,7 @@ module "cloudfront" {
   aliases                 = [local.frontend_domain]
   acm_certificate_arn     = module.acm.acm_certificate_arn
   api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
+  api_origin_path         = "/${split("/", module.api_gateway.invoke_url)[3]}"
   api_path_pattern        = "/api/v1/*"
   tags = {
     Environment = var.environment
@@ -99,7 +100,7 @@ module "lambda" {
 module "api_gateway" {
   source              = "./modules/api_gateway"
   lambda_function_arn = module.lambda.backend_lambda_function_arn
-  stage_name          = "prod"
+  stage_name          = var.environment
   api_name            = "tally-api"
   aws_region          = var.aws_region
 }

@@ -55,7 +55,7 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl                = 0
     forwarded_values {
       query_string = true
-      headers      = ["*", "Authorization"]
+      headers      = ["*"]
       cookies {
         forward = "all"
       }

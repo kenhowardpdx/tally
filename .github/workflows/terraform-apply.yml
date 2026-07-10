@@ -67,7 +67,7 @@ jobs:
 
       - name: Build & Stage Lambda
         run: |
-          pip install --target ../backend/dist fastapi uvicorn httpx --quiet
+          pip install --target ../backend/dist fastapi uvicorn httpx mangum --quiet
           cp ../backend/src/main.py ../backend/dist/
           (cd ../backend/dist && zip -r ../../infra/backend.zip . -q)
           rm -rf ../backend/dist

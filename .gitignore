@@ -51,6 +51,9 @@ infra/.aws-credentials
 # Ignore plan file
 infra/tfplan
 
+# Ignore built Lambda deployment package
+infra/backend.zip
+
 # Docker
 **/tmp/
 **/logs/

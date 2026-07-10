@@ -56,7 +56,12 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl                = 0
     forwarded_values {
       query_string = true
-      headers      = ["*"]
+      # Do not forward Host: API Gateway's execute-api domain is itself fronted by
+      # AWS's shared edge network, and forwarding the viewer's Host header (e.g. via
+      # a "*" wildcard) collides with tally.kenhoward.dev being a registered
+      # CloudFront alias, causing misrouted/misdirected-request errors instead of
+      # reaching the Lambda backend.
+      headers = ["Authorization", "Content-Type", "Accept"]
       cookies {
         forward = "all"
       }

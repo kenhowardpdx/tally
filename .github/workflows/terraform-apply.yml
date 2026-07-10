@@ -76,7 +76,8 @@ jobs:
           terraform apply -auto-approve -target=module.backend_s3 \
             -var="aws_account_id=${AWS_ACCOUNT_ID}" -var="environment=${TF_VAR_environment}"
           aws s3 cp backend.zip s3://${BUCKET}/backend.zip
-          rm -f backend.zip
+          # backend.zip is kept (not deleted) so the Plan/Apply steps below can hash it
+          # via source_code_hash and detect that the Lambda function needs updating.
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}

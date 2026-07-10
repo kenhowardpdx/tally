@@ -51,21 +51,16 @@ resource "aws_cloudfront_distribution" "frontend" {
     cached_methods         = ["GET", "HEAD", "OPTIONS"]
     target_origin_id       = "api-gateway"
     viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 0
-    max_ttl                = 0
-    forwarded_values {
-      query_string = true
-      # Do not forward Host: API Gateway's execute-api domain is itself fronted by
-      # AWS's shared edge network, and forwarding the viewer's Host header (e.g. via
-      # a "*" wildcard) collides with tally.kenhoward.dev being a registered
-      # CloudFront alias, causing misrouted/misdirected-request errors instead of
-      # reaching the Lambda backend.
-      headers = ["Authorization", "Content-Type", "Accept"]
-      cookies {
-        forward = "all"
-      }
-    }
+
+    # Managed-CachingDisabled: this behavior proxies a live API, not cacheable content.
+    cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+
+    # Managed-AllViewerExceptHostHeader: forwards all headers/cookies/query strings
+    # except Host. API Gateway's execute-api domain is itself fronted by AWS's shared
+    # edge network, and forwarding the viewer's Host header (tally.kenhoward.dev, a
+    # registered CloudFront alias) collides with that routing, causing
+    # misdirected-request errors instead of reaching the Lambda backend.
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
   }
 
   aliases     = var.aliases

@@ -43,6 +43,17 @@ variable "environment" {
   default     = "prod"
   # Set via environment variable TF_VAR_environment
   # GitHub Actions: Uses workflow inputs or defaults to production
+
+  validation {
+    # Only "prod" is supported today: infra/backend.conf hardcodes a single shared
+    # state key, and the CloudFront alias/ACM cert (infra/main.tf's frontend_domain)
+    # aren't environment-parameterized. A non-prod apply would reuse prod's state,
+    # force-replace the (immutable) API Gateway stage, and repoint the live prod
+    # CloudFront distribution instead of creating an isolated environment. Expand
+    # this list only after those pieces are also made environment-aware.
+    condition     = var.environment == "prod"
+    error_message = "environment must be \"prod\" - see the validation block comment for why other values aren't safe yet."
+  }
 }
 
 variable "database_url_readwrite" {

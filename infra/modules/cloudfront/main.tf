@@ -1,3 +1,11 @@
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host_header" {
+  name = "Managed-AllViewerExceptHostHeader"
+}
+
 resource "aws_cloudfront_origin_access_control" "s3_oac" {
   name                              = "${var.bucket_name}-oac"
   description                       = "OAC for S3 static site"
@@ -20,6 +28,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   origin {
     domain_name = var.api_gateway_domain_name
     origin_id   = "api-gateway"
+    origin_path = var.api_origin_path
     custom_origin_config {
       http_port              = 80
       https_port             = 443
@@ -50,16 +59,16 @@ resource "aws_cloudfront_distribution" "frontend" {
     cached_methods         = ["GET", "HEAD", "OPTIONS"]
     target_origin_id       = "api-gateway"
     viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 0
-    max_ttl                = 0
-    forwarded_values {
-      query_string = true
-      headers      = ["*", "Authorization"]
-      cookies {
-        forward = "all"
-      }
-    }
+
+    # Managed-CachingDisabled: this behavior proxies a live API, not cacheable content.
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
+
+    # Managed-AllViewerExceptHostHeader: forwards all headers/cookies/query strings
+    # except Host. API Gateway's execute-api domain is itself fronted by AWS's shared
+    # edge network, and forwarding the viewer's Host header (tally.kenhoward.dev, a
+    # registered CloudFront alias) collides with that routing, causing
+    # misdirected-request errors instead of reaching the Lambda backend.
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host_header.id
   }
 
   aliases     = var.aliases

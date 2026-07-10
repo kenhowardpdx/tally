@@ -39,6 +39,13 @@ provider "aws" {
 
 locals {
   frontend_domain = "tally.kenhoward.dev"
+
+  # module.api_gateway.invoke_url looks like "https://<id>.execute-api.<region>.amazonaws.com/<stage>".
+  # The REST API id/region aren't available anywhere else, so the domain has to come
+  # from this URL. The stage segment is always var.environment (module.api_gateway is
+  # called with stage_name = var.environment below) - used directly rather than
+  # re-parsed back out of the URL for the same value.
+  api_gateway_domain_name = split("/", replace(module.api_gateway.invoke_url, "https://", ""))[0]
 }
 
 
@@ -75,7 +82,8 @@ module "cloudfront" {
   bucket_name             = "${var.project}-frontend-${var.environment}-${var.aws_account_id}"
   aliases                 = [local.frontend_domain]
   acm_certificate_arn     = module.acm.acm_certificate_arn
-  api_gateway_domain_name = replace(replace(module.api_gateway.invoke_url, "https://", ""), "/prod", "")
+  api_gateway_domain_name = local.api_gateway_domain_name
+  api_origin_path         = "/${var.environment}"
   api_path_pattern        = "/api/v1/*"
   tags = {
     Environment = var.environment
@@ -99,7 +107,7 @@ module "lambda" {
 module "api_gateway" {
   source              = "./modules/api_gateway"
   lambda_function_arn = module.lambda.backend_lambda_function_arn
-  stage_name          = "prod"
+  stage_name          = var.environment
   api_name            = "tally-api"
   aws_region          = var.aws_region
 }

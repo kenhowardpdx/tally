@@ -28,9 +28,20 @@ variable "api_path_pattern" {
 }
 
 variable "api_origin_path" {
-  description = "Path CloudFront prepends when forwarding to the API Gateway origin (e.g., /prod), since the origin's execute-api domain alone omits the stage."
+  description = "Path CloudFront prepends when forwarding to the API Gateway origin (e.g., /prod)."
   type        = string
   default     = ""
+
+  validation {
+    # CloudFront origin_path must be empty, or start with "/" and not end with "/"
+    # (a bare "/" fails both). substr() (not startswith()/endswith()) so this works
+    # on Terraform >= 1.0, matching the module's stated required_version.
+    condition = var.api_origin_path == "" || (
+      substr(var.api_origin_path, 0, 1) == "/" &&
+      substr(var.api_origin_path, -1, 1) != "/"
+    )
+    error_message = "api_origin_path must be empty, or start with \"/\" and not end with \"/\"."
+  }
 }
 
 variable "tags" {

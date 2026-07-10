@@ -109,7 +109,9 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 #### .secrets File Pattern
 
-Create a `.secrets` file in the project root for local development:
+There is exactly **one** `.secrets` file, in the project root (never one under `infra/` —
+`infra/Makefile` sources it via `../.secrets`). Copy `.secrets.example` to `.secrets` and fill
+in real values:
 
 ```bash
 # .secrets file (never commit - already in .gitignore)
@@ -117,7 +119,14 @@ AWS_PROFILE=AdministratorAccess-123456789012
 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/tally-github-actions-role
 TF_VAR_aws_account_id=123456789012
 TF_VAR_aws_profile=AdministratorAccess-123456789012
+
+# Neon (Postgres) - see .secrets.example for the full set of vars
+TF_VAR_database_url_readwrite='postgresql://user:password@ep-example-pooler.us-west-2.aws.neon.tech/dbname?sslmode=require&channel_binding=require'
+TF_VAR_database_url_readonly='postgresql://user:password@ep-example-pooler.us-west-2.aws.neon.tech/dbname?sslmode=require&channel_binding=require'
 ```
+
+Note the single quotes around the Neon connection strings — the querystring's unescaped `&`
+would otherwise be parsed by bash as a job-control operator.
 
 Source it in your shell:
 

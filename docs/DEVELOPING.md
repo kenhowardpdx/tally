@@ -314,7 +314,9 @@ The Makefile uses a generic pattern that:
 
 #### Configuration
 
-Create a `.secrets` file for sensitive values:
+Uses the same `.secrets` file in the project root described under [Security](#security) above
+(copy `.secrets.example` to get started) — there should only ever be one, never a second copy
+under `infra/`. At minimum it needs:
 
 ```bash
 # .secrets (add to .gitignore)

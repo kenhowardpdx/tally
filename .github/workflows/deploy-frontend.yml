@@ -49,6 +49,13 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build Assets
+        env:
+          PUBLIC_AUTH0_DOMAIN: ${{ secrets.TALLY_AUTH0_DOMAIN }}
+          PUBLIC_AUTH0_CLIENT_ID: ${{ secrets.TALLY_AUTH0_CLIENT_ID }}
+          PUBLIC_AUTH0_AUDIENCE: ${{ secrets.TALLY_AUTH0_AUDIENCE }}
+          # Empty: prod frontend and API share an origin via CloudFront's /api/v1/* routing
+          # (see infra/main.tf's cloudfront module), so API calls are relative.
+          PUBLIC_API_BASE_URL: ""
         run: yarn build
 
       - name: Verify Build Output

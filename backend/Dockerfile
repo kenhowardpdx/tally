@@ -15,7 +15,7 @@ RUN pip install --upgrade poetry poetry-plugin-export
 COPY pyproject.toml poetry.lock* /app/
 
 # Export Poetry dependencies to a requirements.txt file and install them with pip
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes \
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes --with server \
     && pip install -r requirements.txt
 
 # Copy the rest of your application code

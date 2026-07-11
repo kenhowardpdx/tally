@@ -2,6 +2,24 @@
 # yarn lockfile v1
 
 
+"@auth0/auth0-auth-js@^1.10.0":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@auth0/auth0-auth-js/-/auth0-auth-js-1.11.0.tgz#94458721551d5135d13d2fd2b0e44cdf1f7848b7"
+  integrity sha512-hy5knYIPKECTLCPCZKolHsdOkjZhCAc59pga4Y3dp8q7E1uVSKYI7BUhzukNVykUshJRmcgPwOiBtsn2JjUo6w==
+  dependencies:
+    jose "^6.0.8"
+    openid-client "^6.8.0"
+
+"@auth0/auth0-spa-js@^2.23.0":
+  version "2.23.0"
+  resolved "https://registry.yarnpkg.com/@auth0/auth0-spa-js/-/auth0-spa-js-2.23.0.tgz#bac6aa1c25f746c4cf42b765d324f545df5be5aa"
+  integrity sha512-fRiPlTIMLahes6eXq5C4CF8zFi9vLxUtii8e7CESmzWBJGSa3jRrnjgQVAPSaox2x+CwzTFcJbt4mR+UiVMk1Q==
+  dependencies:
+    "@auth0/auth0-auth-js" "^1.10.0"
+    browser-tabs-lock "^1.3.0"
+    dpop "^2.1.1"
+    es-cookie "~1.3.2"
+
 "@esbuild/aix-ppc64@0.25.11":
   version "0.25.11"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.25.11.tgz#2ae33300598132cc4cf580dbbb28d30fed3c5c49"
@@ -358,6 +376,13 @@ axobject-query@^4.1.0:
   resolved "https://registry.yarnpkg.com/axobject-query/-/axobject-query-4.1.0.tgz#28768c76d0e3cff21bc62a9e2d0b6ac30042a1ee"
   integrity sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==
 
+browser-tabs-lock@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/browser-tabs-lock/-/browser-tabs-lock-1.3.0.tgz#4c0381b47b55cd29feaaea5846b7bb97aac76053"
+  integrity sha512-g6nHaobTiT0eMZ7jh16YpD2kcjAp+PInbiVq3M1x6KKaEIVhT4v9oURNIpZLOZ3LQbQ3XYfNhMAb/9hzNLIWrw==
+  dependencies:
+    lodash ">=4.17.21"
+
 chokidar@^4.0.1:
   version "4.0.3"
   resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-4.0.3.tgz#7be37a4c03c9aee1ecfe862a4a23b2c70c205d30"
@@ -391,6 +416,16 @@ devalue@^5.3.2:
   version "5.4.2"
   resolved "https://registry.yarnpkg.com/devalue/-/devalue-5.4.2.tgz#d002d836f9e92fc0c3bd9b76ea69129cbf99dca7"
   integrity sha512-MwPZTKEPK2k8Qgfmqrd48ZKVvzSQjgW0lXLxiIBA8dQjtf/6mw6pggHNLcyDKyf+fI6eXxlQwPsfaCMTU5U+Bw==
+
+dpop@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/dpop/-/dpop-2.1.1.tgz#f132df2bdf97b8fd5f13afe14ef659d072d8d051"
+  integrity sha512-J0Of2JTiM4h5si0tlbPQ/lkqfZ5wAEVkKYBhkwyyANnPJfWH4VsR5uIkZ+T+OSPIwDYUg1fbd5Mmodd25HjY1w==
+
+es-cookie@~1.3.2:
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/es-cookie/-/es-cookie-1.3.2.tgz#80e831597f72a25721701bdcb21d990319acd831"
+  integrity sha512-UTlYYhXGLOy05P/vKVT2Ui7WtC7NiRzGtJyAKKn32g5Gvcjn7KAClLPWlipCtxIus934dFg9o9jXiBL0nP+t9Q==
 
 esbuild@^0.25.0:
   version "0.25.11"
@@ -453,6 +488,11 @@ is-reference@^3.0.3:
   dependencies:
     "@types/estree" "^1.0.6"
 
+jose@^6.0.8, jose@^6.2.2:
+  version "6.2.3"
+  resolved "https://registry.yarnpkg.com/jose/-/jose-6.2.3.tgz#0975197ad973251221c658a3cddc4b951a250c2d"
+  integrity sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==
+
 kleur@^4.1.5:
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/kleur/-/kleur-4.1.5.tgz#95106101795f7050c6c650f350c683febddb1780"
@@ -462,6 +502,11 @@ locate-character@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/locate-character/-/locate-character-3.0.0.tgz#0305c5b8744f61028ef5d01f444009e00779f974"
   integrity sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==
+
+lodash@>=4.17.21:
+  version "4.18.1"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.18.1.tgz#ff2b66c1f6326d59513de2407bf881439812771c"
+  integrity sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==
 
 magic-string@^0.30.11, magic-string@^0.30.17, magic-string@^0.30.5:
   version "0.30.21"
@@ -489,6 +534,19 @@ nanoid@^3.3.11:
   version "3.3.11"
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.11.tgz#4f4f112cefbe303202f2199838128936266d185b"
   integrity sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==
+
+oauth4webapi@^3.8.5:
+  version "3.8.6"
+  resolved "https://registry.yarnpkg.com/oauth4webapi/-/oauth4webapi-3.8.6.tgz#0ede466d8be8774db38558a90612c8b6186abba4"
+  integrity sha512-iwemM91xz8nryHti2yTmg5fhyEMVOkOXwHNqbvcATjyajb5oQxCQzrNOA6uElRHuMhQQTKUyFKV9y/CNyg25BQ==
+
+openid-client@^6.8.0:
+  version "6.8.4"
+  resolved "https://registry.yarnpkg.com/openid-client/-/openid-client-6.8.4.tgz#573e852a9c6ea3fcfe180956da6aaf979c4e4724"
+  integrity sha512-QSw0BA08piujetEwfZsHoTrDpMEha7GDZDicQqVwX4u0ChCjefvjDB++TZ8BTg76UpwhzIQgdvvfgfl3HpCSAw==
+  dependencies:
+    jose "^6.2.2"
+    oauth4webapi "^3.8.5"
 
 picocolors@^1.0.0, picocolors@^1.1.1:
   version "1.1.1"

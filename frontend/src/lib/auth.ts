@@ -60,16 +60,17 @@ export async function initAuth(): Promise<void> {
 	}
 }
 
-export async function login(redirectTo = window.location.pathname): Promise<void> {
+export async function login(redirectTo?: string): Promise<void> {
 	if (!browser) return;
 	try {
+		const targetRedirect = redirectTo ?? window.location.pathname;
 		// No authorizationParams override here - the constructor's (redirect_uri,
 		// audience) already apply to every call, and re-specifying just
 		// redirect_uri risks a future reader assuming it needs to repeat audience
 		// too, when in fact it doesn't (the SDK shallow-merges per-call params
 		// over the client's defaults, so leaving audience out here already works,
 		// but that's non-obvious from this call site).
-		await getClient().loginWithRedirect({ appState: { redirectTo } });
+		await getClient().loginWithRedirect({ appState: { redirectTo: targetRedirect } });
 	} catch (err) {
 		// Callers (event handlers, the dashboard's $effect) don't await this -
 		// an unhandled rejection here would otherwise surface as an uncaught
@@ -88,5 +89,6 @@ export async function logout(): Promise<void> {
 }
 
 export async function getAccessToken(): Promise<string> {
+	if (!browser) throw new Error('getAccessToken() can only be called in the browser');
 	return getClient().getTokenSilently();
 }

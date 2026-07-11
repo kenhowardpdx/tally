@@ -4,13 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      [
-        "infra/**",
-        "backend/alembic/**",
-        "backend/src/**",
-        "backend/pyproject.toml",
-        "backend/poetry.lock",
-      ]
+      - "infra/**"
+      - "backend/alembic/**"
+      - "backend/src/**"
+      - "backend/pyproject.toml"
+      - "backend/poetry.lock"
   workflow_dispatch:
     inputs:
       environment:

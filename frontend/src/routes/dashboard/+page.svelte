@@ -2,9 +2,10 @@
 	import { apiFetch } from '$lib/api';
 	import { isAuthenticated, isLoading, login } from '$lib/auth';
 
-	// Protected route pattern: while auth state is loading, render nothing;
-	// once resolved, redirect unauthenticated visitors to Auth0 login instead
-	// of rendering the page. Every protected route follows this shape.
+	// Protected route pattern: while auth state is loading, show a loading
+	// placeholder; once resolved, redirect unauthenticated visitors to Auth0
+	// login instead of rendering the page. Every protected route follows this
+	// shape.
 	$effect(() => {
 		if (!$isLoading && !$isAuthenticated) login();
 	});

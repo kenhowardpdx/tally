@@ -23,6 +23,7 @@ class BillUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     enabled: bool | None = None
+    account_id: int | None = None
 
 
 class BillRead(BaseModel):

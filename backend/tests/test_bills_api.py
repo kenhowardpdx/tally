@@ -74,6 +74,43 @@ async def test_delete_bill(client: AsyncClient):
     assert res.json() == []
 
 
+async def test_move_bill_to_another_owned_account(client: AsyncClient):
+    account_a = await _create_account(client)
+    account_b = (await client.post("/api/v1/accounts", json={"name": "Savings"})).json()
+    bill = (
+        await client.post(f"/api/v1/accounts/{account_a['id']}/bills", json=_bill_payload())
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account_a['id']}/bills/{bill['id']}",
+        json={"account_id": account_b["id"]},
+    )
+    assert res.status_code == 200
+    assert res.json()["account_id"] == account_b["id"]
+
+    res = await client.get(f"/api/v1/accounts/{account_a['id']}/bills")
+    assert res.json() == []
+    res = await client.get(f"/api/v1/accounts/{account_b['id']}/bills")
+    assert len(res.json()) == 1
+
+
+async def test_cannot_move_bill_to_another_users_account(client: AsyncClient):
+    account = await _create_account(client)
+    bill = (
+        await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    ).json()
+
+    _login_as("auth0|someone-else")
+    other_account = (await client.post("/api/v1/accounts", json={"name": "Their account"})).json()
+    _login_as("auth0|owner")
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}",
+        json={"account_id": other_account["id"]},
+    )
+    assert res.status_code == 404
+
+
 async def test_bills_scoped_to_account_owner(client: AsyncClient):
     account = await _create_account(client)
     await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())

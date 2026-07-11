@@ -29,10 +29,8 @@ async def get_current_db_user(
     return user
 
 
-async def get_owned_bank_account(
-    account_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_db_user),
+async def get_bank_account_or_404(
+    account_id: int, db: AsyncSession, current_user: User
 ) -> BankAccount:
     result = await db.execute(
         select(BankAccount).where(
@@ -43,3 +41,11 @@ async def get_owned_bank_account(
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return account
+
+
+async def get_owned_bank_account(
+    account_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_db_user),
+) -> BankAccount:
+    return await get_bank_account_or_404(account_id, db, current_user)

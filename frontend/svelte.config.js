@@ -8,10 +8,11 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter()
+		// fallback: 'index.html' makes this a true client-routed SPA (S3's
+		// error_document already serves index.html for any unknown path - see
+		// infra/modules/frontend_s3/main.tf) instead of relying on prerendering
+		// every route, which breaks for dynamic routes like /accounts/[id].
+		adapter: adapter({ fallback: 'index.html' })
 	}
 };
 

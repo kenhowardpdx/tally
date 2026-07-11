@@ -11,7 +11,10 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     auth0_sub: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Nullable: Auth0 access tokens for a custom API audience don't carry
+    # profile claims like email by default (that needs a custom Auth0
+    # Action), so it's not reliably available at JIT-provisioning time.
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

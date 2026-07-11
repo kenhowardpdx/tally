@@ -142,7 +142,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 0 — Foundations
 
-**Status**: code complete; blocked on manual Auth0 tenant creation (see 0.4)
+**Status**: code complete
 
 - [x] 0.1 Finalize data model (turn the sketch above into real SQLAlchemy models + an ER
       diagram in this doc)
@@ -153,26 +153,24 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       prod's Neon connection shape
 - [x] 0.4 Backend JWT validation dependency (`get_current_user`, `backend/src/core/auth.py`)
       + protected test endpoint (`GET /api/v1/me`), tested against a locally-signed RSA
-      token so it doesn't depend on a real tenant existing yet. **Manual step still
-      needed**: create the Auth0 tenant + API, then fill in `AUTH0_DOMAIN`/`AUTH0_AUDIENCE`
-      in `backend/.env` (see `backend/.env.example`).
+      token so it doesn't depend on a real tenant existing yet. Auth0 tenant + API created;
+      `AUTH0_DOMAIN`/`AUTH0_AUDIENCE` filled in `backend/.env` (see `backend/.env.example`).
 - [x] 0.5 Auth0 frontend integration in SvelteKit (`frontend/src/lib/auth.ts`):
-      login/logout, protected route pattern (`frontend/src/routes/dashboard/+page.svelte`),
-      token attached to API calls (`frontend/src/lib/api.ts`). Also blocked on the same
-      manual tenant step — fill in `PUBLIC_AUTH0_DOMAIN`/`PUBLIC_AUTH0_CLIENT_ID`/
-      `PUBLIC_AUTH0_AUDIENCE` in `frontend/.env` (see `frontend/.env.example`), and add the
-      dev URL (e.g. `http://localhost:5173`) as an Allowed Callback/Logout/Web Origin URL
-      in the Auth0 SPA application settings.
+      login/logout, protected route pattern (`frontend/src/routes/(app)/+layout.svelte`),
+      token attached to API calls (`frontend/src/lib/api.ts`). `PUBLIC_AUTH0_DOMAIN`/
+      `PUBLIC_AUTH0_CLIENT_ID`/`PUBLIC_AUTH0_AUDIENCE` filled in `frontend/.env` (see
+      `frontend/.env.example`), and the dev URL (`http://localhost:5173`) added as an
+      Allowed Callback/Logout/Web Origin URL in the Auth0 SPA application settings.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: not started
+**Status**: code complete
 
-- [ ] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
-- [ ] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
+- [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
+- [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
       toggle
-- [ ] 1.3 Frontend: accounts list/management page
-- [ ] 1.4 Frontend: bills list/management page per account (Svelte equivalent of
+- [x] 1.3 Frontend: accounts list/management page
+- [x] 1.4 Frontend: bills list/management page per account (Svelte equivalent of
       `clientv0`'s `Bills.tsx` editable table UX)
 
 ## Phase 2 — Forecast Engine

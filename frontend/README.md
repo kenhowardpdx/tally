@@ -1,38 +1,39 @@
-# sv
+# Tally Frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A [SvelteKit](https://svelte.dev/docs/kit) (Svelte 5) app that manages bank accounts and bills,
+and (eventually) renders the cash-flow forecast. Deployed as a static SPA to S3/CloudFront in
+prod (see `infra/modules/frontend_s3`); talks to the backend API and to Auth0 directly from the
+browser.
 
-## Creating a project
+## Getting Started
 
-If you're seeing this, you've probably already done this step. Congrats!
+Requires Node >=20.19 (or >=22.12, or >=24) — check with `node -v`; `.nvmrc` floats to the
+current LTS, so `nvm install` picks up a compatible version.
 
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+```bash
+cp .env.example .env   # fill in PUBLIC_AUTH0_* from your Auth0 SPA application, and add
+                        # http://localhost:5173 as an Allowed Callback/Logout/Web Origin URL
+                        # in that application's settings
+yarn install
+yarn dev
 ```
 
-## Developing
+The backend must be running separately (see `backend/README.md`, or `docker compose up` from
+the repo root to run everything together) — `PUBLIC_API_BASE_URL` in `.env` points at it.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Type Checking
 
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+```bash
+yarn run check
 ```
+
+(`yarn check` runs Yarn's own built-in command, not the `check` script — use `yarn run check`.)
 
 ## Building
 
-To create a production version of your app:
-
-```sh
-npm run build
+```bash
+yarn build
 ```
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Produces a static export via `@sveltejs/adapter-static` (`fallback: 'index.html'`, full
+client-side routing) into `build/`. Preview it locally with `yarn preview`.

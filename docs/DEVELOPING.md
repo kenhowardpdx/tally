@@ -4,29 +4,74 @@ This guide helps you set up Tally for local development, workflow testing, and i
 
 ## Project Overview
 
-Tally is a financial application for managing recurring bills and forecasting bank account balances. The backend is built with Python (FastAPI), infrastructure is managed with Terraform on AWS, and CI/CD is handled by GitHub Actions (locally tested with act).
+Tally is a financial application for managing recurring bills and forecasting bank account balances. The backend is Python (FastAPI + SQLAlchemy/Alembic), the frontend is SvelteKit (Svelte 5), infrastructure is managed with Terraform on AWS, and CI/CD is handled by GitHub Actions (locally tested with act).
 
 ## Prerequisites
 
-- Python 3.13+
-- Poetry
-- Docker
-- act
-- AWS CLI
+- Python 3.13+ and Poetry (backend)
+- Node.js >=20.19 (or >=22.12, or >=24) and Yarn (frontend) — `.nvmrc` floats to the current LTS
+- Docker (Postgres locally, or the whole stack via Docker Compose)
+- AWS CLI, act (only needed for infrastructure/CI work — see below)
 
 ## First-time Setup
 
 1. Clone the repo
-2. Install Python dependencies: `poetry install`
-3. Set up AWS credentials: `make aws-login`
-4. Start Docker
-5. Run tests: `make test`
-6. Run workflows locally: `make github_workflow_terraform-pr`
+2. `cp backend/.env.example backend/.env` and `cp frontend/.env.example frontend/.env`, then
+   fill in the Auth0 values from your tenant/SPA application (see [Local Application
+   Development](#local-application-development) below)
+3. Start Docker and run `docker compose up -d`
+4. Apply database migrations: `cd backend && poetry run alembic upgrade head`
+5. Run tests: `cd backend && poetry run pytest` (frontend has no test suite yet)
+
+Steps 3-5 are only needed once (and again whenever new migrations land). Everything past this
+point — Terraform, AWS SSO, and `act` — is for infrastructure/CI work, not day-to-day app
+development.
+
+## Local Application Development
+
+The full stack (Postgres, backend, frontend) runs via Docker Compose from the repo root:
+
+```bash
+docker compose up -d
+cd backend && poetry run alembic upgrade head   # first run, and after new migrations
+```
+
+- Frontend: http://localhost:5173 (hot-reloads — the frontend container bind-mounts the
+  source tree)
+- Backend: http://localhost:8000
+
+To run either service outside Docker instead (e.g. for a debugger), see `backend/README.md`
+and `frontend/README.md`.
+
+### Auth0
+
+Both services need real Auth0 values before login works:
+
+- `backend/.env`: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE` — from the Auth0 tenant and the API you
+  registered there.
+- `frontend/.env`: `PUBLIC_AUTH0_DOMAIN`, `PUBLIC_AUTH0_CLIENT_ID`, `PUBLIC_AUTH0_AUDIENCE` —
+  from the Auth0 SPA application. Add `http://localhost:5173` as an Allowed Callback/Logout/Web
+  Origin URL in that application's settings.
+
+### `.secrets` vs. `backend/.env` / `frontend/.env`
+
+These serve different purposes and both are needed — one isn't a replacement for the other:
+
+- **`backend/.env`, `frontend/.env`**: runtime configuration for the *application itself*
+  (database URL, Auth0 values). Read directly by the backend/frontend processes, whether run
+  locally or in Docker Compose. Not used by Terraform or CI.
+- **`.secrets`** (repo root): credentials for *infrastructure and CI tooling* — AWS SSO
+  profile/role and Terraform variables (`TF_VAR_*`, including the Neon connection strings and
+  Auth0 values Terraform passes to Lambda). Used by `make` targets, `act` (local GitHub Actions
+  runs), and direct `terraform` commands. Not read by the running application. Copy
+  `.secrets.example` to get started; see [Configuration](#configuration) below for the minimum
+  required values.
 
 ## Security
 
 - Never commit secrets or credentials.
-- Use `.secrets` for sensitive values (already in `.gitignore`).
+- Use `.secrets` for infra/CI values and `backend/.env`/`frontend/.env` for app config (already
+  in `.gitignore`).
 
 ---
 
@@ -414,57 +459,22 @@ For more details, see the workflow and Makefile comments.
    act pull_request
    ```
 
-### Accessing RDS PostgreSQL via Bastion Host
+### Accessing the Production Database (Neon)
 
-## Retrieve the Database Password
+Production uses [Neon](https://neon.tech) (managed Postgres), not RDS — there's no bastion host
+or VPC hop needed. The Neon project/database is created and managed manually (not
+Terraform-managed; see the "Neon: manual vs. Terraform-managed" decision in
+[docs/ROADMAP.md](ROADMAP.md)).
 
-The RDS password is stored in AWS Secrets Manager:
-
-```bash
-aws secretsmanager get-secret-value --secret-id prod-rds-postgres-password --query 'SecretString' --output text
-```
-
-## Connect to the Bastion Host
-
-1. Get the bastion host public IP from Terraform output or AWS Console.
-2. SSH into the bastion host:
+Connect directly with the connection string from the Neon console (or from `.secrets`'
+`TF_VAR_database_url_readwrite`/`TF_VAR_database_url_readonly`, which use the same value):
 
 ```bash
-ssh -i /path/to/your-ssh-key.pem ec2-user@<bastion_public_ip>
+psql "postgresql://user:password@ep-example-pooler.us-west-2.aws.neon.tech/dbname?sslmode=require"
 ```
 
-## Connect to RDS from Bastion Host
-
-Once on the bastion host, use psql or any PostgreSQL client:
-
-```bash
-psql -h <rds_endpoint> -U admin -d tally
-```
-
-- `<rds_endpoint>`: Get from Terraform output or AWS Console
-- `admin`: Default username
-- `tally`: Default database name
-- Password: Retrieve from Secrets Manager as above
-
-## SSH Port Forwarding (Optional)
-
-To connect to RDS from your local machine via the bastion:
-
-```bash
-ssh -i /path/to/your-ssh-key.pem -L 5432:<rds_endpoint>:5432 ec2-user@<bastion_public_ip>
-```
-
-Then connect locally:
-
-```bash
-psql -h localhost -U admin -d tally
-```
-
-## Security Notes
-
-- Bastion host should be stopped when not needed to minimize costs.
-- Restrict SSH access to your IP in the bastion security group.
-- Never expose RDS directly to the public internet.
+Treat production data with care — prefer the read-only connection string for anything that
+isn't an intentional write.
 
 ### Additional Resources
 

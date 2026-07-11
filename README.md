@@ -4,21 +4,31 @@ Tally is a financial application for managing recurring bills and forecasting ba
 
 ## Tech Stack
 
-- Backend: Python (FastAPI)
+- Backend: Python (FastAPI), SQLAlchemy (async) + Alembic, PostgreSQL (Neon in prod)
+- Frontend: SvelteKit (Svelte 5), Tailwind CSS
+- Auth: Auth0
 - Infrastructure: Terraform (AWS)
 - CI/CD: GitHub Actions, tested locally with [act](https://github.com/nektos/act)
 
 ## Getting Started
 
-1. Clone the repo
-2. Install dependencies (see `docs/DEVELOPING.md`)
-3. Run tests: `make test`
+The whole stack (Postgres, backend, frontend) runs via Docker Compose:
 
-## Local Workflow Testing
+```sh
+docker compose up -d
+cd backend && poetry run alembic upgrade head   # first run only
+```
 
-We use [act](https://github.com/nektos/act) to run GitHub Actions locally. See [Development Guide](docs/DEVELOPING.md) for details.
+- Frontend: http://localhost:5173
+- Backend: http://localhost:8000
+
+See [backend/README.md](backend/README.md) and [frontend/README.md](frontend/README.md) for
+running each service outside Docker (e.g. with hot-reload via `poetry run uvicorn --reload` or
+`yarn dev` directly), and [docs/DEVELOPING.md](docs/DEVELOPING.md) for the full local
+development guide, including testing GitHub Actions workflows locally with `act`.
 
 ## Documentation
 
 - [Development Guide](docs/DEVELOPING.md)
+- [Roadmap](docs/ROADMAP.md)
 - [Infrastructure](infra/README.md)

@@ -30,3 +30,23 @@ variable "database_url_readonly" {
     error_message = "database_url_readonly must not be empty."
   }
 }
+
+variable "auth0_domain" {
+  description = "Auth0 tenant domain (e.g. your-tenant.us.auth0.com), used for JWKS-based JWT validation"
+  type        = string
+
+  validation {
+    condition     = length(var.auth0_domain) > 0
+    error_message = "auth0_domain must not be empty."
+  }
+}
+
+variable "auth0_audience" {
+  description = "Auth0 API identifier the backend validates JWT audiences against"
+  type        = string
+
+  validation {
+    condition     = length(var.auth0_audience) > 0
+    error_message = "auth0_audience must not be empty."
+  }
+}

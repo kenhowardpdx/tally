@@ -99,6 +99,8 @@ module "lambda" {
 
   database_url_readwrite = var.database_url_readwrite
   database_url_readonly  = var.database_url_readonly
+  auth0_domain           = var.auth0_domain
+  auth0_audience         = var.auth0_audience
 
   lambda_code_s3_bucket = module.backend_s3.bucket_name
 }

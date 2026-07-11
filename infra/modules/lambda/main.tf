@@ -36,7 +36,7 @@ locals {
 
 resource "aws_lambda_function" "backend" {
   function_name    = "${var.project}-backend"
-  handler          = "main.handler"
+  handler          = "src.main.handler"
   runtime          = "python3.13"
   s3_bucket        = var.lambda_code_s3_bucket
   s3_key           = "backend.zip"
@@ -47,6 +47,8 @@ resource "aws_lambda_function" "backend" {
     variables = {
       DATABASE_URL_READWRITE = var.database_url_readwrite
       DATABASE_URL_READONLY  = var.database_url_readonly
+      AUTH0_DOMAIN           = var.auth0_domain
+      AUTH0_AUDIENCE         = var.auth0_audience
     }
   }
 }

@@ -83,6 +83,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: "DUMMY-CONNECTION-STRING"
           TF_VAR_database_url_readonly: "DUMMY-CONNECTION-STRING"
+          TF_VAR_auth0_domain: "dummy.us.auth0.com"
+          TF_VAR_auth0_audience: "https://dummy-audience"
         continue-on-error: true
 
       - name: Comment

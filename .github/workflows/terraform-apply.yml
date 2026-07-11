@@ -67,10 +67,17 @@ jobs:
 
       - name: Build & Stage Lambda
         run: |
-          pip install --target ../backend/dist fastapi uvicorn httpx mangum --quiet
-          cp ../backend/src/main.py ../backend/dist/
+          pip install poetry poetry-plugin-export --quiet
+          poetry -C ../backend export -f requirements.txt --output ../backend/requirements.txt --without-hashes
+          # Installed natively on this (Linux x86_64) runner rather than with an explicit
+          # --platform tag: different deps publish different manylinux tags (e.g. greenlet
+          # ships manylinux_2_28, cffi ships manylinux2014), so forcing one exact tag across
+          # all of them fails. A native install picks whatever's compatible per-package, and
+          # this runner's glibc is compatible with the Lambda python3.13 (AL2023) runtime.
+          pip install --target ../backend/dist -r ../backend/requirements.txt --quiet
+          cp -r ../backend/src ../backend/dist/src
           (cd ../backend/dist && zip -r ../../infra/backend.zip . -q)
-          rm -rf ../backend/dist
+          rm -rf ../backend/dist ../backend/requirements.txt
 
           BUCKET="tally-backend-${TF_VAR_environment}-${AWS_ACCOUNT_ID}-us-west-2"
           terraform apply -auto-approve -target=module.backend_s3 \
@@ -84,6 +91,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
+          TF_VAR_auth0_domain: ${{ secrets.TALLY_AUTH0_DOMAIN }}
+          TF_VAR_auth0_audience: ${{ secrets.TALLY_AUTH0_AUDIENCE }}
 
       - name: Plan
         id: plan
@@ -107,6 +116,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
+          TF_VAR_auth0_domain: ${{ secrets.TALLY_AUTH0_DOMAIN }}
+          TF_VAR_auth0_audience: ${{ secrets.TALLY_AUTH0_AUDIENCE }}
 
       - name: Apply
         if: steps.plan.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
@@ -116,6 +127,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_database_url_readwrite: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
+          TF_VAR_auth0_domain: ${{ secrets.TALLY_AUTH0_DOMAIN }}
+          TF_VAR_auth0_audience: ${{ secrets.TALLY_AUTH0_AUDIENCE }}
 
       - name: Output
         if: success()

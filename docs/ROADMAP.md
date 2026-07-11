@@ -62,38 +62,107 @@ porting rather than re-deriving from scratch:
   database/schema isn't Terraform-managed yet, just manually created. Formalizing that
   is a Phase 0 task, not required before it).
 
-## Data model (sketch — refine in Phase 0.1)
+## Data model
 
-```
-users            id, auth0_sub, email, created_at
-bank_accounts    id, user_id, name, institution, created_at
-bills            id, account_id, name, amount_cents, recurrence_type,
-                 recurrence_config (jsonb), start_date, end_date, enabled, created_at, updated_at
-transactions     id, account_id, bill_id (nullable), amount_cents, date, description, created_at
-windfalls        id, account_id, amount_cents, expected_date, name, created_at
+Implemented in `backend/src/models/` (SQLAlchemy 2.0, `Mapped`/`mapped_column` style) and
+codified in the Alembic migration at `backend/alembic/versions/262a5ed35636_initial_schema.py`.
+
+```mermaid
+erDiagram
+    USERS ||--o{ BANK_ACCOUNTS : owns
+    BANK_ACCOUNTS ||--o{ BILLS : has
+    BANK_ACCOUNTS ||--o{ TRANSACTIONS : has
+    BANK_ACCOUNTS ||--o{ WINDFALLS : has
+    BILLS ||--o{ TRANSACTIONS : "generates (optional)"
+
+    USERS {
+        int id PK
+        string auth0_sub
+        string email
+        datetime created_at
+    }
+    BANK_ACCOUNTS {
+        int id PK
+        int user_id FK
+        string name
+        string institution
+        datetime created_at
+    }
+    BILLS {
+        int id PK
+        int account_id FK
+        string name
+        bigint amount_cents
+        enum recurrence_type
+        jsonb recurrence_config
+        date start_date
+        date end_date
+        bool enabled
+        datetime created_at
+        datetime updated_at
+    }
+    TRANSACTIONS {
+        int id PK
+        int account_id FK
+        int bill_id FK "nullable"
+        bigint amount_cents
+        date date
+        string description
+        datetime created_at
+    }
+    WINDFALLS {
+        int id PK
+        int account_id FK
+        bigint amount_cents
+        date expected_date
+        string name
+        datetime created_at
+    }
 ```
 
 Maps directly to the 8 differences: `users.auth0_sub` → auth; `bank_accounts` → multi-account;
 whole schema → Postgres; `bills.enabled` → enable/disable; `recurrence_type`/`recurrence_config`
 → finer intervals; `transactions` → one-off entries; `windfalls` → future windfalls.
 
+`recurrence_type` is a Postgres enum (`weekly`, `biweekly`, `semimonthly`, `monthly`, `annually`,
+`custom_days`); `recurrence_config` holds the type-specific shape (e.g. `{"day_of_month": 15}`,
+`{"days": [10, 25]}` for semimonthly, `{"interval_days": 45}` for custom_days) — validated by the
+forecast engine in Phase 2, not by a DB constraint.
+
+### Neon: manual vs. Terraform-managed (Phase 0.2 decision)
+
+**Decision: keep the Neon project/database manual for now.** The connection strings already flow
+into the Lambda's environment via `TF_VAR_database_url_readwrite`/`readonly` (see
+`infra/variables.tf`), and Alembic now owns schema evolution independently of Terraform — so
+bringing Neon itself under the Terraform Neon provider would manage project/branch creation but
+wouldn't simplify anything currently painful. Revisit if/when multiple environments (e.g. a
+per-PR preview branch) make manual Neon console clicks a recurring chore.
+
 ---
 
 ## Phase 0 — Foundations
 
-**Status**: not started
+**Status**: code complete; blocked on manual Auth0 tenant creation (see 0.4)
 
-- [ ] 0.1 Finalize data model (turn the sketch above into real SQLAlchemy models + an ER
+- [x] 0.1 Finalize data model (turn the sketch above into real SQLAlchemy models + an ER
       diagram in this doc)
-- [ ] 0.2 Alembic setup + initial migration creating all tables; formalize the Neon
+- [x] 0.2 Alembic setup + initial migration creating all tables; formalize the Neon
       database connection (confirm whether to bring it under Terraform via the Neon
       provider, or keep it manual — decide and document here)
-- [ ] 0.3 Local dev: docker-compose Postgres for backend dev, `.env` pattern mirroring
+- [x] 0.3 Local dev: docker-compose Postgres for backend dev, `.env` pattern mirroring
       prod's Neon connection shape
-- [ ] 0.4 Auth0 tenant setup + backend JWT validation dependency (`get_current_user`) +
-      one protected test endpoint
-- [ ] 0.5 Auth0 frontend integration in SvelteKit (login/logout, protected route
-      pattern, token attached to API calls)
+- [x] 0.4 Backend JWT validation dependency (`get_current_user`, `backend/src/core/auth.py`)
+      + protected test endpoint (`GET /api/v1/me`), tested against a locally-signed RSA
+      token so it doesn't depend on a real tenant existing yet. **Manual step still
+      needed**: create the Auth0 tenant + API, then fill in `AUTH0_DOMAIN`/`AUTH0_AUDIENCE`
+      in `backend/.env` (see `backend/.env.example`).
+- [x] 0.5 Auth0 frontend integration in SvelteKit (`frontend/src/lib/auth.ts`):
+      login/logout, protected route pattern (`frontend/src/routes/dashboard/+page.svelte`),
+      token attached to API calls (`frontend/src/lib/api.ts`). Also blocked on the same
+      manual tenant step — fill in `PUBLIC_AUTH0_DOMAIN`/`PUBLIC_AUTH0_CLIENT_ID`/
+      `PUBLIC_AUTH0_AUDIENCE` in `frontend/.env` (see `frontend/.env.example`), and add the
+      dev URL (e.g. `http://localhost:5173`) as an Allowed Callback/Logout/Web Origin URL
+      in the Auth0 SPA application settings.
 
 ## Phase 1 — Accounts & Bills CRUD
 
@@ -156,3 +225,14 @@ session (or a fresh Claude Code instance) orient in under a minute.
 
 - 2026-07-10: Roadmap created. No app code yet — `backend/` and `frontend/` are both
   bare scaffolds (from the earlier prod-outage recovery work). Next: Phase 0.1.
+- 2026-07-10: Phase 0 built out end-to-end: SQLAlchemy models + ER diagram (0.1), Alembic
+  wired up with a verified initial migration — upgrade/downgrade round-trip tested against
+  real Postgres, including a fix for the Postgres-enum-survives-drop-table gotcha (0.2),
+  docker-compose Postgres for local dev on host port 5433 (5432 was taken by an unrelated
+  `bank` project container) (0.3), JWT validation dependency + `GET /api/v1/me` tested with
+  a locally-signed RSA token (0.4), and SvelteKit Auth0 SPA integration — login/logout,
+  protected `/dashboard` route, token-attaching `apiFetch` helper, verified via
+  `svelte-check` and a full static build (0.5). **Not done**: the actual Auth0 tenant/API
+  doesn't exist yet — that's a manual console step (see 0.4/0.5 notes above) before the
+  frontend↔backend auth flow can be exercised for real. Next: create the Auth0 tenant, then
+  start Phase 1 (accounts & bills CRUD).

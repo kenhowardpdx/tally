@@ -1,7 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tally
+      POSTGRES_PASSWORD: tally
+      POSTGRES_DB: tally
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tally"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL_READWRITE: postgresql+asyncpg://tally:tally@postgres:5432/tally
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

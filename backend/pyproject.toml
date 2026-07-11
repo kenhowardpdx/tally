@@ -18,6 +18,7 @@ pydantic-settings = "^2.14.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+pytest-asyncio = "^0.24.0"
 
 # Needed to run the Docker Compose / container deployment path, not the Lambda
 # handler (Mangum wraps the app directly there) - kept out of the main group so
@@ -28,6 +29,9 @@ gunicorn = {extras = ["standard"], version = "^23.0.0"}
 # CLI-only, for running migrations against Neon - not imported by the app itself.
 [tool.poetry.group.migrate.dependencies]
 alembic = "^1.18.5"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["poetry-core"]

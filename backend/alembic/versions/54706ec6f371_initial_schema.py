@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 262a5ed35636
+Revision ID: 54706ec6f371
 Revises: 
-Create Date: 2026-07-10 20:27:17.157963
+Create Date: 2026-07-10 21:18:37.694933
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '262a5ed35636'
+revision: str = '54706ec6f371'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -45,7 +45,7 @@ def upgrade() -> None:
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('amount_cents', sa.BigInteger(), nullable=False),
-    sa.Column('recurrence_type', sa.Enum('WEEKLY', 'BIWEEKLY', 'SEMIMONTHLY', 'MONTHLY', 'ANNUALLY', 'CUSTOM_DAYS', name='recurrence_type'), nullable=False),
+    sa.Column('recurrence_type', sa.Enum('weekly', 'biweekly', 'semimonthly', 'monthly', 'annually', 'custom_days', name='recurrence_type'), nullable=False),
     sa.Column('recurrence_config', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=True),

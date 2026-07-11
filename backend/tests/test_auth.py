@@ -59,9 +59,15 @@ def test_get_current_user_accepts_valid_token(monkeypatch, rsa_keypair):
     assert payload["email"] == "user@example.com"
 
 
-def test_get_current_user_rejects_wrong_audience(monkeypatch, rsa_keypair):
+def test_get_current_user_rejects_wrong_audience_without_refetching_jwks(monkeypatch, rsa_keypair):
     private_pem, public_pem = rsa_keypair
-    monkeypatch.setattr(auth, "_get_jwks", lambda force_refresh=False: _jwks_for(public_pem))
+    calls = []
+
+    def fake_get_jwks(force_refresh: bool = False) -> dict:
+        calls.append(force_refresh)
+        return _jwks_for(public_pem)
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_get_jwks)
 
     token = _make_token(private_pem, aud="someone-elses-api")
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -69,11 +75,20 @@ def test_get_current_user_rejects_wrong_audience(monkeypatch, rsa_keypair):
     with pytest.raises(HTTPException) as exc_info:
         auth.get_current_user(credentials)
     assert exc_info.value.status_code == 401
+    # A wrong audience isn't a stale-JWKS problem - a refetch wouldn't help,
+    # so get_current_user shouldn't waste a request on one.
+    assert calls == [False]
 
 
-def test_get_current_user_rejects_expired_token(monkeypatch, rsa_keypair):
+def test_get_current_user_rejects_expired_token_without_refetching_jwks(monkeypatch, rsa_keypair):
     private_pem, public_pem = rsa_keypair
-    monkeypatch.setattr(auth, "_get_jwks", lambda force_refresh=False: _jwks_for(public_pem))
+    calls = []
+
+    def fake_get_jwks(force_refresh: bool = False) -> dict:
+        calls.append(force_refresh)
+        return _jwks_for(public_pem)
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_get_jwks)
 
     token = _make_token(private_pem, exp=time.time() - 60)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -81,6 +96,7 @@ def test_get_current_user_rejects_expired_token(monkeypatch, rsa_keypair):
     with pytest.raises(HTTPException) as exc_info:
         auth.get_current_user(credentials)
     assert exc_info.value.status_code == 401
+    assert calls == [False]
 
 
 def test_get_current_user_rejects_token_signed_by_wrong_key(monkeypatch, rsa_keypair):

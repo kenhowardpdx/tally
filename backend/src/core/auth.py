@@ -2,6 +2,7 @@ import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
 from src.core.config import settings
 
@@ -38,10 +39,16 @@ def get_current_user(
     try:
         try:
             payload = _decode(token, _get_jwks())
+        except (ExpiredSignatureError, JWTClaimsError):
+            # Not a key problem (expired token / wrong audience or issuer) - a
+            # fresh JWKS wouldn't change the outcome, so don't bother refetching.
+            raise
         except JWTError:
-            # Our cached JWKS may predate an Auth0 signing-key rotation - refetch
-            # once before giving up, rather than 401ing every request until this
-            # process/container recycles.
+            # jose wraps a signature-verification failure (jws.verify's JWSError)
+            # into a plain JWTError - that's the case a stale JWKS actually causes,
+            # e.g. an Auth0 signing-key rotation since our cache was populated.
+            # Refetch once before giving up, rather than 401ing every request
+            # until this process/container recycles.
             payload = _decode(token, _get_jwks(force_refresh=True))
     except (JWTError, httpx.HTTPError) as exc:
         raise HTTPException(

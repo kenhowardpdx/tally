@@ -27,7 +27,11 @@ class Bill(Base):
     name: Mapped[str] = mapped_column(String(255))
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     recurrence_type: Mapped[RecurrenceType] = mapped_column(
-        Enum(RecurrenceType, name="recurrence_type")
+        Enum(
+            RecurrenceType,
+            name="recurrence_type",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        )
     )
     # Type-specific recurrence fields, e.g. {"day_of_month": 15} or
     # {"days": [10, 25]} for semimonthly, or {"interval_days": 45} for custom_days.

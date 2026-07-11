@@ -65,7 +65,7 @@ porting rather than re-deriving from scratch:
 ## Data model
 
 Implemented in `backend/src/models/` (SQLAlchemy 2.0, `Mapped`/`mapped_column` style) and
-codified in the Alembic migration at `backend/alembic/versions/262a5ed35636_initial_schema.py`.
+codified in the Alembic migration at `backend/alembic/versions/54706ec6f371_initial_schema.py`.
 
 ```mermaid
 erDiagram

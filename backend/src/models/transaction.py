@@ -4,6 +4,7 @@ from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
+from src.models.bill import Bill
 
 
 class Transaction(Base):
@@ -24,4 +25,4 @@ class Transaction(Base):
     )
 
     bank_account: Mapped["BankAccount"] = relationship(back_populates="transactions")
-    bill: Mapped["Bill | None"] = relationship(back_populates="transactions")
+    bill: Mapped[Bill | None] = relationship(back_populates="transactions")

@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 54706ec6f371
+Revision ID: 9f979f5fb842
 Revises: 
-Create Date: 2026-07-10 21:18:37.694933
+Create Date: 2026-07-10 21:35:57.621097
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '54706ec6f371'
+revision: str = '9f979f5fb842'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -46,10 +46,10 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('amount_cents', sa.BigInteger(), nullable=False),
     sa.Column('recurrence_type', sa.Enum('weekly', 'biweekly', 'semimonthly', 'monthly', 'annually', 'custom_days', name='recurrence_type'), nullable=False),
-    sa.Column('recurrence_config', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column('recurrence_config', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False),
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=True),
-    sa.Column('enabled', sa.Boolean(), nullable=False),
+    sa.Column('enabled', sa.Boolean(), server_default=sa.text('true'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['bank_accounts.id'], ondelete='CASCADE'),

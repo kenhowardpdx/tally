@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum, ForeignKey, String, func, text, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,10 +35,14 @@ class Bill(Base):
     )
     # Type-specific recurrence fields, e.g. {"day_of_month": 15} or
     # {"days": [10, 25]} for semimonthly, or {"interval_days": 45} for custom_days.
-    recurrence_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # server_default (not just the ORM-side default) so raw SQL/admin-tool
+    # inserts that bypass the ORM don't hit a NOT NULL violation.
+    recurrence_config: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

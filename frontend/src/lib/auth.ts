@@ -50,10 +50,13 @@ export async function initAuth(): Promise<void> {
 }
 
 export async function login(redirectTo = window.location.pathname): Promise<void> {
-	await getClient().loginWithRedirect({
-		authorizationParams: { redirect_uri: window.location.origin },
-		appState: { redirectTo }
-	});
+	// No authorizationParams override here - the constructor's (redirect_uri,
+	// audience) already apply to every call, and re-specifying just
+	// redirect_uri risks a future reader assuming it needs to repeat audience
+	// too, when in fact it doesn't (the SDK shallow-merges per-call params
+	// over the client's defaults, so leaving audience out here already works,
+	// but that's non-obvious from this call site).
+	await getClient().loginWithRedirect({ appState: { redirectTo } });
 }
 
 export async function logout(): Promise<void> {

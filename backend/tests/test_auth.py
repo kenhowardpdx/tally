@@ -1,5 +1,6 @@
 import time
 
+import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -110,6 +111,24 @@ def test_get_current_user_rejects_token_signed_by_wrong_key(monkeypatch, rsa_key
     with pytest.raises(HTTPException) as exc_info:
         auth.get_current_user(credentials)
     assert exc_info.value.status_code == 401
+
+
+def test_get_current_user_returns_503_when_jwks_unreachable(monkeypatch, rsa_keypair):
+    private_pem, _ = rsa_keypair
+
+    def broken_get_jwks(force_refresh: bool = False) -> dict:
+        raise httpx.ConnectError("could not reach auth0")
+
+    monkeypatch.setattr(auth, "_get_jwks", broken_get_jwks)
+
+    token = _make_token(private_pem)
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+    with pytest.raises(HTTPException) as exc_info:
+        auth.get_current_user(credentials)
+    # An Auth0/JWKS outage is an upstream problem, not a client auth failure -
+    # it shouldn't look like an invalid token (401).
+    assert exc_info.value.status_code == 503
 
 
 def test_get_current_user_refetches_jwks_once_on_stale_cache(monkeypatch, rsa_keypair):

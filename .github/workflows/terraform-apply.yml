@@ -3,7 +3,7 @@ name: Terraform Apply
 on:
   push:
     branches: [main]
-    paths: ["infra/**"]
+    paths: ["infra/**", "backend/alembic/**"]
   workflow_dispatch:
     inputs:
       environment:
@@ -93,6 +93,16 @@ jobs:
           TF_VAR_database_url_readonly: ${{ secrets.TALLY_DATABASE_URL_READONLY }}
           TF_VAR_auth0_domain: ${{ secrets.TALLY_AUTH0_DOMAIN }}
           TF_VAR_auth0_audience: ${{ secrets.TALLY_AUTH0_AUDIENCE }}
+
+      - name: Run DB Migrations
+        run: |
+          poetry -C ../backend export -f requirements.txt --output ../backend/migrate-requirements.txt \
+            --without-hashes --with migrate
+          pip install -r ../backend/migrate-requirements.txt --quiet
+          (cd ../backend && alembic upgrade head)
+          rm -f ../backend/migrate-requirements.txt
+        env:
+          DATABASE_URL_READWRITE: ${{ secrets.TALLY_DATABASE_URL_READWRITE }}
 
       - name: Plan
         id: plan

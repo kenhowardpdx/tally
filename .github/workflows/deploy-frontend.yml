@@ -88,3 +88,22 @@ jobs:
             exit 1
           fi
           aws s3 sync . s3://$bucket_name/ --region "$AWS_REGION" --delete || { echo "❌ S3 sync failed."; exit 1; }
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          alias="tally.kenhoward.dev"
+          distribution_ids=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items && contains(Aliases.Items, '${alias}')].Id" \
+            --output text)
+
+          # Ensure we got exactly one match (AWS CLI text output is whitespace-separated)
+          set -- $distribution_ids
+          if [ $# -eq 0 ]; then
+            echo "❌ No matching CloudFront distribution found for alias: ${alias}"
+            exit 1
+          elif [ $# -gt 1 ]; then
+            echo "❌ Multiple CloudFront distributions matched alias ${alias}: ${distribution_ids}"
+            exit 1
+          fi
+
+          aws cloudfront create-invalidation --distribution-id "$1" --paths "/*"

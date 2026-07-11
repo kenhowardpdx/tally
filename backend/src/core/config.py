@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
         query_params = [
             ("ssl" if key == "sslmode" else key, val)
-            for key, val in parse_qsl(parts.query)
+            for key, val in parse_qsl(parts.query, keep_blank_values=True)
             if key != "channel_binding"
         ]
 

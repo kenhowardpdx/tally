@@ -8,7 +8,7 @@ This directory contains the Terraform infrastructure as code for deploying Tally
 graph TB
     subgraph AWS["AWS Cloud"]
         subgraph DNS["DNS & CDN Layer"]
-            R53["Route 53<br/>tally.kenhowardpdx.com"]
+            R53["Route 53<br/>tally.kenhoward.dev"]
             CF["CloudFront Distribution<br/>(CDN + SSL/TLS)"]
             ACM["ACM Certificate<br/>(SSL/TLS)"]
         end
@@ -22,12 +22,9 @@ graph TB
             Lambda["Lambda Function<br/>(Python + FastAPI)"]
         end
 
-        subgraph Data["Data Layer"]
-            RDS["RDS PostgreSQL<br/>(Database)"]
-            Secrets["AWS Secrets Manager<br/>(DB Credentials)"]
-        end
     end
 
+    Neon["Neon PostgreSQL<br/>(managed, outside AWS - see docs/ROADMAP.md)"]
     User["User Browser"]
     Auth0["Auth0<br/>Authentication Service"]
 
@@ -38,9 +35,12 @@ graph TB
     User --> APIGW
     APIGW --> Lambda
     Lambda --> Auth0
-    Lambda --> RDS
-    Lambda --> Secrets
+    Lambda --> Neon
 ```
+
+Connection strings and Auth0 values reach the Lambda as plain environment variables
+(`TF_VAR_database_url_readwrite`/`readonly`, `TF_VAR_auth0_domain`/`audience` — see
+`modules/lambda/main.tf`), not AWS Secrets Manager.
 
 ## Prerequisites
 
@@ -138,22 +138,19 @@ The infrastructure is organized into reusable modules:
 ### Available Modules
 
 - **`lambda`**: Backend API (Python FastAPI)
-- **`api_gateway`**: HTTP API endpoints and routing
-- **`acm`**: SSL/TLS certificates
-- **`route53`**: DNS and domain management
-- **`auth0`**: Authentication integration
+- **`api_gateway`**: REST API endpoint routing to the Lambda
+- **`backend_s3`**: S3 bucket for Lambda deployment artifacts
+- **`frontend_s3`**: S3 bucket for the static frontend build
+- **`cloudfront`**: CDN in front of `frontend_s3`, proxying `/api/v1/*` to `api_gateway`
+- **`acm`**: SSL/TLS certificate for the CloudFront custom domain
+- **`auth0`**: placeholder — the Auth0 tenant/API/SPA app are created manually in the Auth0
+  dashboard, not via Terraform (this module currently has no resources)
 
 ### Module Status
 
-Currently, all modules are commented out in `main.tf` as placeholders. Uncomment and configure modules as you implement each component:
-
-```hcl
-# In main.tf, uncomment when ready to implement:
-# module "lambda" {
-#   source = "./modules/lambda"
-#   # Add lambda module variables here
-# }
-```
+All modules above except `auth0` are implemented and wired up in `main.tf`. Two stub blocks
+remain commented out at the bottom of `main.tf` (a duplicate `acm` and an `auth0` module call)
+— safe to ignore or clean up, not part of the active configuration.
 
 ## Development Workflow
 

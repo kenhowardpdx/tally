@@ -14,7 +14,12 @@ _jwks_cache: dict | None = None
 def _get_jwks(force_refresh: bool = False) -> dict:
     global _jwks_cache
     if _jwks_cache is None or force_refresh:
-        response = httpx.get(f"https://{settings.auth0_domain}/.well-known/jwks.json")
+        # Explicit and tighter than httpx's 5s default - this blocks every
+        # cold-cache request, so a slow/unreachable Auth0 should fail fast
+        # rather than tie up the request for a library-default duration.
+        response = httpx.get(
+            f"https://{settings.auth0_domain}/.well-known/jwks.json", timeout=3.0
+        )
         response.raise_for_status()
         _jwks_cache = response.json()
     return _jwks_cache

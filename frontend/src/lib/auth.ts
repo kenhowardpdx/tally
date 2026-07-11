@@ -34,19 +34,30 @@ function getClient(): Auth0Client {
 export async function initAuth(): Promise<void> {
 	if (!browser) return;
 
-	const auth0 = getClient();
-	const params = new URLSearchParams(window.location.search);
+	try {
+		const auth0 = getClient();
+		const params = new URLSearchParams(window.location.search);
 
-	if (params.has('code') && params.has('state')) {
-		const { appState } = await auth0.handleRedirectCallback();
-		window.history.replaceState({}, document.title, window.location.pathname);
-		if (appState?.redirectTo) await goto(appState.redirectTo);
+		if (params.has('code') && params.has('state')) {
+			const { appState } = await auth0.handleRedirectCallback();
+			window.history.replaceState({}, document.title, window.location.pathname);
+			if (appState?.redirectTo) await goto(appState.redirectTo);
+		}
+
+		const authenticated = await auth0.isAuthenticated();
+		isAuthenticated.set(authenticated);
+		user.set(authenticated ? await auth0.getUser() : undefined);
+	} catch (err) {
+		// Misconfiguration, network error, or a bad/expired callback code/state -
+		// fail safe to "not authenticated" rather than leaving isLoading stuck
+		// true (which would strand every route behind an infinite loading state)
+		// or letting this become an unhandled promise rejection.
+		console.error('Auth0 initialization failed:', err);
+		isAuthenticated.set(false);
+		user.set(undefined);
+	} finally {
+		isLoading.set(false);
 	}
-
-	const authenticated = await auth0.isAuthenticated();
-	isAuthenticated.set(authenticated);
-	user.set(authenticated ? await auth0.getUser() : undefined);
-	isLoading.set(false);
 }
 
 export async function login(redirectTo = window.location.pathname): Promise<void> {

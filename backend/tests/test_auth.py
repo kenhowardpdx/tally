@@ -47,6 +47,16 @@ def _make_token(private_pem: bytes, **claim_overrides) -> str:
     return jwt.encode(claims, private_pem, algorithm="RS256")
 
 
+def test_get_current_user_rejects_missing_credentials_with_401():
+    # HTTPBearer(auto_error=False) passes None here when the Authorization
+    # header is absent - get_current_user must handle that itself rather than
+    # crashing on credentials.credentials (AttributeError -> 500) or relying
+    # on HTTPBearer's default auto_error behavior (which raises 403, not 401).
+    with pytest.raises(HTTPException) as exc_info:
+        auth.get_current_user(None)
+    assert exc_info.value.status_code == 401
+
+
 def test_get_current_user_accepts_valid_token(monkeypatch, rsa_keypair):
     private_pem, public_pem = rsa_keypair
     monkeypatch.setattr(auth, "_get_jwks", lambda force_refresh=False: _jwks_for(public_pem))

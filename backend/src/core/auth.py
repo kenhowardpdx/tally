@@ -6,7 +6,11 @@ from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
 from src.core.config import settings
 
-security = HTTPBearer()
+# auto_error=False: HTTPBearer's default (auto_error=True) raises 403 "Not
+# authenticated" on a missing header, not 401 - inconsistent with every other
+# auth failure this dependency raises. With it off, credentials is None
+# instead, and get_current_user raises 401 itself for that case too.
+security = HTTPBearer(auto_error=False)
 
 _jwks_cache: dict | None = None
 
@@ -52,8 +56,12 @@ def _fetch_jwks_or_503(force_refresh: bool = False) -> dict:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
     token = credentials.credentials
     jwks = _fetch_jwks_or_503()
     try:

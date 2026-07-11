@@ -11,7 +11,7 @@ app = FastAPI()
 # /api/v1/* routing (see infra/main.tf's cloudfront module), so this is a no-op.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

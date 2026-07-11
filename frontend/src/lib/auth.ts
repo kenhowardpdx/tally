@@ -61,17 +61,30 @@ export async function initAuth(): Promise<void> {
 }
 
 export async function login(redirectTo = window.location.pathname): Promise<void> {
-	// No authorizationParams override here - the constructor's (redirect_uri,
-	// audience) already apply to every call, and re-specifying just
-	// redirect_uri risks a future reader assuming it needs to repeat audience
-	// too, when in fact it doesn't (the SDK shallow-merges per-call params
-	// over the client's defaults, so leaving audience out here already works,
-	// but that's non-obvious from this call site).
-	await getClient().loginWithRedirect({ appState: { redirectTo } });
+	if (!browser) return;
+	try {
+		// No authorizationParams override here - the constructor's (redirect_uri,
+		// audience) already apply to every call, and re-specifying just
+		// redirect_uri risks a future reader assuming it needs to repeat audience
+		// too, when in fact it doesn't (the SDK shallow-merges per-call params
+		// over the client's defaults, so leaving audience out here already works,
+		// but that's non-obvious from this call site).
+		await getClient().loginWithRedirect({ appState: { redirectTo } });
+	} catch (err) {
+		// Callers (event handlers, the dashboard's $effect) don't await this -
+		// an unhandled rejection here would otherwise surface as an uncaught
+		// browser console error with no user-facing indication of what failed.
+		console.error('Auth0 login failed:', err);
+	}
 }
 
 export async function logout(): Promise<void> {
-	await getClient().logout({ logoutParams: { returnTo: window.location.origin } });
+	if (!browser) return;
+	try {
+		await getClient().logout({ logoutParams: { returnTo: window.location.origin } });
+	} catch (err) {
+		console.error('Auth0 logout failed:', err);
+	}
 }
 
 export async function getAccessToken(): Promise<string> {

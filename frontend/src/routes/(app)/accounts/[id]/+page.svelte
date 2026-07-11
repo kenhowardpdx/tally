@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { getAccount, listAccounts } from '$lib/api/accounts';
 	import { createBill, deleteBill, listBills, updateBill } from '$lib/api/bills';
-	import type { Bill, RecurrenceType } from '$lib/api/types';
+	import type { BankAccount, Bill, RecurrenceType } from '$lib/api/types';
 	import Badge from '$lib/components/Badge.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
+	import DatePicker from '$lib/components/DatePicker.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
+	import { recurrenceLabels } from '$lib/recurrence';
 	import { onMount } from 'svelte';
 
 	const accountId = $derived(Number($page.params.id));
@@ -20,6 +25,8 @@
 		'custom_days'
 	];
 
+	let account = $state<BankAccount | null>(null);
+	let accounts = $state<BankAccount[]>([]);
 	let bills = $state<Bill[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
@@ -30,7 +37,24 @@
 	let startDate = $state('');
 	let creating = $state(false);
 
-	async function load() {
+	let movingBill = $state<Bill | null>(null);
+	let moveTargetAccountId = $state('');
+	let moving = $state(false);
+	let showMoveModal = $state(false);
+
+	// Account details and the accounts list (for the move-bill picker) only
+	// change when navigating here or moving a bill elsewhere entirely - they
+	// don't need refetching after every bill create/toggle/delete, unlike
+	// bills itself.
+	async function loadContext() {
+		try {
+			[account, accounts] = await Promise.all([getAccount(accountId), listAccounts()]);
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function loadBills() {
 		loading = true;
 		error = null;
 		try {
@@ -42,7 +66,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		loadContext();
+		loadBills();
+	});
 
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
@@ -59,7 +86,7 @@
 			name = '';
 			amount = '';
 			startDate = '';
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -70,7 +97,7 @@
 	async function toggleEnabled(bill: Bill) {
 		try {
 			await updateBill(accountId, bill.id, { enabled: !bill.enabled });
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -79,9 +106,30 @@
 	async function handleDelete(billId: number) {
 		try {
 			await deleteBill(accountId, billId);
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	function openMoveModal(bill: Bill) {
+		movingBill = bill;
+		moveTargetAccountId = '';
+		showMoveModal = true;
+	}
+
+	async function handleMove(event: SubmitEvent) {
+		event.preventDefault();
+		if (!movingBill || !moveTargetAccountId) return;
+		moving = true;
+		try {
+			await updateBill(accountId, movingBill.id, { account_id: Number(moveTargetAccountId) });
+			showMoveModal = false;
+			await loadBills();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			moving = false;
 		}
 	}
 
@@ -91,7 +139,9 @@
 </script>
 
 <a class="text-sm text-primary underline" href="/accounts">&larr; Accounts</a>
-<h1 class="mt-2 text-2xl font-semibold text-text">Bills</h1>
+<h1 class="mt-2 text-2xl font-semibold text-text">
+	Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+</h1>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
@@ -101,19 +151,12 @@
 	<form class="flex flex-wrap items-end gap-4" onsubmit={handleCreate}>
 		<Input label="Name" bind:value={name} placeholder="Rent" required />
 		<Input label="Amount ($)" type="number" bind:value={amount} placeholder="1500.00" required />
-		<div class="flex flex-col gap-1">
-			<label for="recurrence" class="text-sm font-medium text-text">Recurrence</label>
-			<select
-				id="recurrence"
-				bind:value={recurrenceType}
-				class="rounded-card border border-slate-300 px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-			>
-				{#each recurrenceOptions as option (option)}
-					<option value={option}>{option}</option>
-				{/each}
-			</select>
-		</div>
-		<Input label="Start date" type="date" bind:value={startDate} required />
+		<Select label="Frequency" bind:value={recurrenceType}>
+			{#each recurrenceOptions as option (option)}
+				<option value={option}>{recurrenceLabels[option]}</option>
+			{/each}
+		</Select>
+		<DatePicker label="Start date" bind:value={startDate} />
 		<Button type="submit" disabled={creating}>Add bill</Button>
 	</form>
 </Card>
@@ -129,7 +172,7 @@
 				<tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
 					<th class="px-4 py-2 font-medium">Name</th>
 					<th class="px-4 py-2 font-medium">Amount</th>
-					<th class="px-4 py-2 font-medium">Recurrence</th>
+					<th class="px-4 py-2 font-medium">Frequency</th>
 					<th class="px-4 py-2 font-medium">Status</th>
 					<th class="px-4 py-2"></th>
 				</tr>
@@ -139,14 +182,17 @@
 					<tr class="border-b border-slate-100 last:border-0">
 						<td class="px-4 py-2">{bill.name}</td>
 						<td class="px-4 py-2">{formatAmount(bill.amount_cents)}</td>
-						<td class="px-4 py-2 text-slate-600">{bill.recurrence_type}</td>
+						<td class="px-4 py-2 text-slate-600">{recurrenceLabels[bill.recurrence_type]}</td>
 						<td class="px-4 py-2">
 							<button onclick={() => toggleEnabled(bill)}>
 								<Badge enabled={bill.enabled} />
 							</button>
 						</td>
 						<td class="px-4 py-2 text-right">
-							<Button variant="danger" onclick={() => handleDelete(bill.id)}>Delete</Button>
+							<div class="flex justify-end gap-2">
+								<Button variant="secondary" onclick={() => openMoveModal(bill)}>Move</Button>
+								<Button variant="danger" onclick={() => handleDelete(bill.id)}>Delete</Button>
+							</div>
 						</td>
 					</tr>
 				{/each}
@@ -154,3 +200,25 @@
 		</Table>
 	{/if}
 </div>
+
+<Modal bind:open={showMoveModal} title="Move bill">
+	{#if movingBill}
+		<form class="flex flex-col gap-4" onsubmit={handleMove}>
+			<p class="text-sm text-slate-600">
+				Move <span class="font-medium text-text">{movingBill.name}</span> to a different account.
+			</p>
+			<Select label="Account" bind:value={moveTargetAccountId} required>
+				<option value="" disabled>Select an account</option>
+				{#each accounts.filter((a) => a.id !== accountId) as target (target.id)}
+					<option value={target.id}>{target.name}</option>
+				{/each}
+			</Select>
+			<div class="flex justify-end gap-2">
+				<Button variant="secondary" type="button" onclick={() => (showMoveModal = false)}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={moving || !moveTargetAccountId}>Move</Button>
+			</div>
+		</form>
+	{/if}
+</Modal>

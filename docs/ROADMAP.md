@@ -164,7 +164,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: code complete; three follow-up items below
+**Status**: code complete; one follow-up item below (1.7, not yet scoped)
 
 - [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
 - [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
@@ -172,12 +172,12 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 - [x] 1.3 Frontend: accounts list/management page
 - [x] 1.4 Frontend: bills list/management page per account (Svelte equivalent of
       `clientv0`'s `Bills.tsx` editable table UX)
-- [ ] 1.5 Bills page header always reads "Bills" regardless of which account you're on —
+- [x] 1.5 Bills page header always reads "Bills" regardless of which account you're on —
       should read `Bills (<Name> - <Bank>)`. Backend already exposes
       `GET /api/v1/accounts/{id}`; frontend just needs a `getAccount` call added to
       `frontend/src/lib/api/accounts.ts` and used in
       `frontend/src/routes/(app)/accounts/[id]/+page.svelte`.
-- [ ] 1.6 Move a bill to a different bank account. Backend: extend `BillUpdate`/
+- [x] 1.6 Move a bill to a different bank account. Backend: extend `BillUpdate`/
       `PATCH .../bills/{id}` (`backend/src/schemas/bill.py`, `backend/src/api/bills.py`) to
       accept a target `account_id`, verifying the target account also belongs to the
       current user (same ownership check pattern as `get_owned_bank_account`). Frontend: an
@@ -225,18 +225,16 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 **Status**: not started
 
 - [ ] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views)
-- [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout, including:
-      - a real date-picker component (the native `<input type="date">` used in the bill form
-        at `frontend/src/routes/(app)/accounts/[id]/+page.svelte` works but looks/behaves
-        inconsistently across browsers)
-      - a `Select` component styled to match `Input` (`frontend/src/lib/components/`) — the
-        recurrence `<select>` in the bill form currently has its own one-off Tailwind classes
-      - rename the "Recurrence" label to "Frequency" in the bill form (same field/enum on the
-        backend — `recurrence_type` — this is a UI copy change only)
-      - human-readable labels for recurrence values in the dropdown and the bills table — no
-        mapping exists today, so raw enum values render as-is (e.g. `custom_days` shows
-        literally as "custom_days" at
-        `frontend/src/routes/(app)/accounts/[id]/+page.svelte:112,142`)
+- [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout. Still open:
+      general responsive layout pass, plus whatever else turns up. Done so far:
+      - [x] a real date-picker component (`frontend/src/lib/components/DatePicker.svelte`,
+        a popover calendar) replacing the native `<input type="date">` in the bill form
+      - [x] a `Select` component styled to match `Input`
+        (`frontend/src/lib/components/Select.svelte`), used for the bill form's Frequency
+        field and the move-bill account picker
+      - [x] renamed the "Recurrence" label to "Frequency" in the bill form
+      - [x] human-readable labels for recurrence values (`frontend/src/lib/recurrence.ts`),
+        used in both the dropdown and the bills table
 - [ ] 4.3 Error handling, loading states, empty states throughout
 - [ ] 4.4 Test coverage: forecast engine (pytest), key frontend components
 
@@ -274,3 +272,9 @@ session (or a fresh Claude Code instance) orient in under a minute.
   name/bank (1.5), no way to move a bill between accounts (1.6), and the native date picker
   needs replacing (folded into 4.2). Next: pick up Phase 1.5/1.6, or start Phase 2
   (forecast engine).
+- 2026-07-11: Picked up 1.5, 1.6, and part of 4.2. Bills page header now shows
+  `Bills (<Name> - <Bank>)`; bills can be moved between accounts via a modal (backend
+  ownership-checks the target account); new `Select`, `Modal`, and `DatePicker` (custom
+  popover calendar, no new dependency) components; "Recurrence" renamed to "Frequency" with
+  human-readable value labels everywhere. Left 1.7 alone (recurrence-config UI) per its own
+  "not yet designed" flag. Next: scope 1.7, or start Phase 2.

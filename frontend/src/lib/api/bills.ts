@@ -15,7 +15,7 @@ export function createBill(accountId: number, input: BillInput): Promise<Bill> {
 export function updateBill(
 	accountId: number,
 	billId: number,
-	input: Partial<BillInput>
+	input: Partial<BillInput> & { account_id?: number }
 ): Promise<Bill> {
 	return apiJson(`/api/v1/accounts/${accountId}/bills/${billId}`, {
 		method: 'PATCH',

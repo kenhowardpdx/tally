@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import get_owned_bank_account
+from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.core.database import get_db
-from src.models import BankAccount, Bill
+from src.models import BankAccount, Bill, User
 from src.schemas.bill import BillCreate, BillRead, BillUpdate
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/bills", tags=["bills"])
@@ -51,8 +51,16 @@ async def update_bill(
     payload: BillUpdate,
     db: AsyncSession = Depends(get_db),
     bill: Bill = Depends(_get_owned_bill),
+    current_user: User = Depends(get_current_db_user),
 ) -> Bill:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+    if "account_id" in update_data:
+        # Moving a bill to another account - the target must also belong to
+        # the current user, same as the account this route is already
+        # scoped to (get_owned_bank_account only validated the *current*
+        # account_id from the URL, not the new one in the body).
+        await get_bank_account_or_404(update_data["account_id"], db, current_user)
+    for field, value in update_data.items():
         setattr(bill, field, value)
     await db.commit()
     await db.refresh(bill)

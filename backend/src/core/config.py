@@ -1,3 +1,5 @@
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,15 +17,30 @@ class Settings(BaseSettings):
 
     @field_validator("database_url_readwrite")
     @classmethod
-    def _use_asyncpg_driver(cls, value: str) -> str:
-        # Neon's console (and most Postgres providers) hand out plain
-        # postgresql:// connection strings - create_async_engine needs the
-        # +asyncpg driver suffix or it falls back to psycopg2 (sync, and not
-        # even installed here). Normalize rather than relying on whoever sets
-        # the secret to remember to add the suffix themselves.
-        if value.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + value.removeprefix("postgresql://")
-        return value
+    def _normalize_for_asyncpg(cls, value: str) -> str:
+        # Neon's console (and most Postgres providers) hand out standard libpq-
+        # style connection strings - a few adjustments make them work with the
+        # asyncpg driver instead:
+        #   - scheme needs the +asyncpg suffix, or SQLAlchemy defaults to the
+        #     sync psycopg2 driver (not installed here).
+        #   - sslmode= is psycopg2/libpq's name for what asyncpg calls ssl= -
+        #     passed through verbatim, asyncpg's connect() rejects the
+        #     unrecognized "sslmode" kwarg outright.
+        #   - channel_binding= has no asyncpg equivalent at all (it negotiates
+        #     channel binding automatically as part of SCRAM auth) - same
+        #     unrecognized-kwarg rejection, so it just gets dropped.
+        parts = urlsplit(value)
+        scheme = "postgresql+asyncpg" if parts.scheme == "postgresql" else parts.scheme
+
+        query_params = [
+            ("ssl" if key == "sslmode" else key, val)
+            for key, val in parse_qsl(parts.query)
+            if key != "channel_binding"
+        ]
+
+        return urlunsplit(
+            (scheme, parts.netloc, parts.path, urlencode(query_params), parts.fragment)
+        )
 
 
 settings = Settings()

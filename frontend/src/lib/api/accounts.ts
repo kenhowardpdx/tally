@@ -5,6 +5,10 @@ export function listAccounts(): Promise<BankAccount[]> {
 	return apiJson('/api/v1/accounts');
 }
 
+export function getAccount(id: number): Promise<BankAccount> {
+	return apiJson(`/api/v1/accounts/${id}`);
+}
+
 export function createAccount(input: BankAccountInput): Promise<BankAccount> {
 	return apiJson('/api/v1/accounts', { method: 'POST', body: JSON.stringify(input) });
 }

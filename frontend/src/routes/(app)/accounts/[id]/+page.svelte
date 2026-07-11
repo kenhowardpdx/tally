@@ -42,15 +42,23 @@
 	let moving = $state(false);
 	let showMoveModal = $state(false);
 
-	async function load() {
+	// Account details and the accounts list (for the move-bill picker) only
+	// change when navigating here or moving a bill elsewhere entirely - they
+	// don't need refetching after every bill create/toggle/delete, unlike
+	// bills itself.
+	async function loadContext() {
+		try {
+			[account, accounts] = await Promise.all([getAccount(accountId), listAccounts()]);
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function loadBills() {
 		loading = true;
 		error = null;
 		try {
-			[account, bills, accounts] = await Promise.all([
-				getAccount(accountId),
-				listBills(accountId),
-				listAccounts()
-			]);
+			bills = await listBills(accountId);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -58,7 +66,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		loadContext();
+		loadBills();
+	});
 
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
@@ -75,7 +86,7 @@
 			name = '';
 			amount = '';
 			startDate = '';
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -86,7 +97,7 @@
 	async function toggleEnabled(bill: Bill) {
 		try {
 			await updateBill(accountId, bill.id, { enabled: !bill.enabled });
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -95,7 +106,7 @@
 	async function handleDelete(billId: number) {
 		try {
 			await deleteBill(accountId, billId);
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -114,7 +125,7 @@
 		try {
 			await updateBill(accountId, movingBill.id, { account_id: Number(moveTargetAccountId) });
 			showMoveModal = false;
-			await load();
+			await loadBills();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {

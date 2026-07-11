@@ -11,6 +11,9 @@
 		children: Snippet;
 	} = $props();
 
+	const uid = $props.id();
+	const titleId = `${uid}-title`;
+
 	function close() {
 		open = false;
 	}
@@ -39,11 +42,11 @@
 			role="dialog"
 			tabindex="-1"
 			aria-modal="true"
-			aria-label={title}
+			aria-labelledby={title ? titleId : undefined}
 		>
 			<div class="mb-4 flex items-center justify-between">
 				{#if title}
-					<h2 class="text-lg font-semibold text-text">{title}</h2>
+					<h2 id={titleId} class="text-lg font-semibold text-text">{title}</h2>
 				{/if}
 				<button
 					type="button"

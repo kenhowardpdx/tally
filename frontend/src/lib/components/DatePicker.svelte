@@ -101,6 +101,8 @@
 		type="button"
 		id={inputId}
 		onclick={() => (open = !open)}
+		aria-haspopup="dialog"
+		aria-expanded={open}
 		class="rounded-card border border-slate-300 px-3 py-2 text-left text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
 	>
 		{value || 'Select date'}
@@ -109,6 +111,8 @@
 	{#if open}
 		<div
 			class="absolute top-full z-10 mt-1 w-64 rounded-card border border-slate-200 bg-surface p-3 shadow-card"
+			role="dialog"
+			aria-label="Choose date"
 		>
 			<div class="mb-2 flex items-center justify-between">
 				<button

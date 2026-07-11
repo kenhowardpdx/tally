@@ -23,6 +23,11 @@ on:
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
+    # Needed to access environment-scoped secrets (TALLY_AUTH0_*) - without
+    # this, secrets.TALLY_AUTH0_* silently resolve to empty strings rather
+    # than erroring, which is exactly what shipped a build with an empty
+    # Auth0 domain/client_id/audience baked into the static site.
+    environment: ${{ github.event.inputs.environment || 'prod' }}
     permissions:
       contents: read
       id-token: write

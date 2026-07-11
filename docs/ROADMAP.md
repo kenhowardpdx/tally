@@ -164,7 +164,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: code complete
+**Status**: code complete; three follow-up items below
 
 - [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
 - [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
@@ -172,6 +172,27 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 - [x] 1.3 Frontend: accounts list/management page
 - [x] 1.4 Frontend: bills list/management page per account (Svelte equivalent of
       `clientv0`'s `Bills.tsx` editable table UX)
+- [ ] 1.5 Bills page header always reads "Bills" regardless of which account you're on —
+      should read `Bills (<Name> - <Bank>)`. Backend already exposes
+      `GET /api/v1/accounts/{id}`; frontend just needs a `getAccount` call added to
+      `frontend/src/lib/api/accounts.ts` and used in
+      `frontend/src/routes/(app)/accounts/[id]/+page.svelte`.
+- [ ] 1.6 Move a bill to a different bank account. Backend: extend `BillUpdate`/
+      `PATCH .../bills/{id}` (`backend/src/schemas/bill.py`, `backend/src/api/bills.py`) to
+      accept a target `account_id`, verifying the target account also belongs to the
+      current user (same ownership check pattern as `get_owned_bank_account`). Frontend: an
+      pop-up modal where the user can select an account to move the bill to; once applied
+      the bills list is updated to show the current list of bills sans the bill that was
+      moved.
+- [ ] 1.7 Recurrence-specific config UI for the bill form — **not yet designed, scope
+      before starting**. Today `createBill` never sends `recurrence_config`
+      (`frontend/src/routes/(app)/accounts/[id]/+page.svelte`), so every bill gets created
+      with an empty `{}` regardless of type, even though the model needs type-specific data:
+      `{"interval_days": N}` (custom_days), `{"days": [10, 25]}` (semimonthly),
+      `{"day_of_month": N}` (monthly), and likely a weekday (weekly/biweekly) or month+day
+      (annually). Needs per-type conditional form fields on both create and edit. Blocks
+      exercising Phase 2's forecast engine end-to-end against real user-created bills of
+      non-trivial recurrence types.
 
 ## Phase 2 — Forecast Engine
 
@@ -204,7 +225,18 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 **Status**: not started
 
 - [ ] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views)
-- [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout
+- [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout, including:
+      - a real date-picker component (the native `<input type="date">` used in the bill form
+        at `frontend/src/routes/(app)/accounts/[id]/+page.svelte` works but looks/behaves
+        inconsistently across browsers)
+      - a `Select` component styled to match `Input` (`frontend/src/lib/components/`) — the
+        recurrence `<select>` in the bill form currently has its own one-off Tailwind classes
+      - rename the "Recurrence" label to "Frequency" in the bill form (same field/enum on the
+        backend — `recurrence_type` — this is a UI copy change only)
+      - human-readable labels for recurrence values in the dropdown and the bills table — no
+        mapping exists today, so raw enum values render as-is (e.g. `custom_days` shows
+        literally as "custom_days" at
+        `frontend/src/routes/(app)/accounts/[id]/+page.svelte:112,142`)
 - [ ] 4.3 Error handling, loading states, empty states throughout
 - [ ] 4.4 Test coverage: forecast engine (pytest), key frontend components
 
@@ -234,3 +266,11 @@ session (or a fresh Claude Code instance) orient in under a minute.
   doesn't exist yet — that's a manual console step (see 0.4/0.5 notes above) before the
   frontend↔backend auth flow can be exercised for real. Next: create the Auth0 tenant, then
   start Phase 1 (accounts & bills CRUD).
+- 2026-07-11: Phase 1 shipped and merged (PR #82) — Auth0 tenant created and verified via a
+  real login; backend accounts/bills CRUD with JIT user provisioning; frontend Tailwind +
+  accounts/bills pages behind an auth-guarded route group; whole stack now runs via
+  `docker compose up`; docs/READMEs/`.example` files reconciled with reality. Follow-ups
+  logged rather than fixed this session: bills page header doesn't show the account
+  name/bank (1.5), no way to move a bill between accounts (1.6), and the native date picker
+  needs replacing (folded into 4.2). Next: pick up Phase 1.5/1.6, or start Phase 2
+  (forecast engine).

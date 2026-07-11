@@ -6,6 +6,10 @@ forecasting app. It's written to survive long gaps between sessions (~6 weeks ap
 what's next. Check off items as they land, and update the "Status" line at the top of
 each phase.
 
+This roadmap is now the planning source of truth. The original GitHub Project / bootstrap
+issue set can be closed once each item is either reflected here, marked shipped, or called out
+as superseded by the architecture decisions below.
+
 ## Vision
 
 A multi-user bill-tracking and forecasting app, evolved from
@@ -240,9 +244,42 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 5 — Production hardening (ongoing, lower priority)
 
-- [ ] Structured logging / basic observability within free-tier limits
-- [ ] Confirm Neon's backup/retention behavior meets expectations
+- [ ] Structured logging / basic observability within free-tier limits (#19)
+- [ ] Confirm Neon's backup/retention behavior meets expectations, plus a documented
+      restore drill / disaster-recovery path (#20)
 - [ ] Periodic cost review (matches CLAUDE.md's cost-first philosophy)
+- [ ] Security hardening review for IAM/Auth0/API/storage settings, keeping the current
+      cost-first architecture in mind (#21)
+- [ ] Production deployment audit: reconcile the older infra/bootstrap issues with the
+      current Terraform + GitHub Actions reality, document what is already live, and split
+      any remaining gaps into smaller concrete follow-ups (#8, #9, #10, #12, #17, #18)
+- [ ] DNS/domain decision: either move DNS to Route 53 and cut over from Hover, or
+      explicitly keep DNS outside AWS and document the manual process/rollback (#13, #14)
+- [ ] End-to-end production verification across Auth0, CloudFront, API Gateway, Lambda,
+      and Neon (#22)
+- [ ] System / ops / API documentation pass, including deployment/runbook coverage (#23)
+
+## Legacy GitHub Project issue crosswalk
+
+Use this when closing the old project-management issues so their intent stays visible here:
+
+- **Already shipped and represented above**
+  - #6 → Phase 0.1-0.2
+  - #7 → Phase 0.4, 1.1, 1.2
+  - #11 → Phase 0.5, 1.3, 1.4, 4.2
+  - #15, #16 → Phase 0.4-0.5
+- **Superseded in original form**
+  - #8 assumed VPC/private-subnet + Secrets Manager plumbing. The current cost-first
+    design instead keeps Lambda out of a VPC and passes Auth0/Neon values as Terraform
+    variables/environment config; track any remaining deployment hardening under Phase 5.
+- **Still relevant, now consolidated into roadmap items above**
+  - #9, #10, #12, #17, #18 → Phase 5 production deployment audit
+  - #13, #14 → Phase 5 DNS/domain decision
+  - #19 → Phase 5 observability
+  - #20 → Phase 5 backup / disaster recovery
+  - #21 → Phase 5 security hardening review
+  - #22 → Phase 5 end-to-end production verification
+  - #23 → Phase 5 documentation pass
 
 ---
 

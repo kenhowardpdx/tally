@@ -190,7 +190,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 0 — Foundations
 
-**Status**: code complete; one follow-up item below (0.6)
+**Status**: code complete
 
 - [x] 0.1 Finalize data model (turn the sketch above into real SQLAlchemy models + an ER
       diagram in this doc)
@@ -209,23 +209,17 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       `PUBLIC_AUTH0_CLIENT_ID`/`PUBLIC_AUTH0_AUDIENCE` filled in `frontend/.env` (see
       `frontend/.env.example`), and the dev URL (`http://localhost:5173`) added as an
       Allowed Callback/Logout/Web Origin URL in the Auth0 SPA application settings.
-- [ ] 0.6 Local dev auth bypass: an opt-in flag (env var, off by default) that skips real
-      Auth0 token validation entirely and JIT-provisions a fixed dummy user, so
-      `docker compose up` can be exercised end-to-end (including by an AI coding
-      assistant in a sandboxed environment) without a real Auth0 login. Dummy identity
-      themed as an It's Always Sunny in Philadelphia character, with an email-shaped
-      display name - e.g. `charlie.kelly@paddys.bar` - close enough to a real Auth0
-      `sub`/`email` claim pair that `get_current_db_user`'s JIT-provisioning path
-      (`backend/src/api/deps.py`) needs no special-casing for it. Backend:
-      short-circuit `get_current_user` (`backend/src/core/auth.py`) when the bypass flag
-      is set, skipping the JWKS fetch/JWT decode entirely. Frontend: skip the Auth0 SPA
-      redirect (`frontend/src/lib/auth.ts`) the same way, so login is instant locally.
-      **Must never be reachable in prod** - gate behind an explicit env var checked at
-      startup, never a request header/query param a client could set.
+- [x] 0.6 Local dev auth bypass: `DEV_AUTH_BYPASS`/`PUBLIC_DEV_AUTH_BYPASS` env vars (off by
+      default, never set in a deployed environment - nothing in `infra/` sets them). Backend
+      short-circuits `get_current_user` (`backend/src/core/auth.py`) before touching
+      JWKS/jose at all; frontend short-circuits `initAuth`/`login`/`logout`/`getAccessToken`
+      (`frontend/src/lib/auth.ts`). Dummy identity: `auth0|charlie_kelly_dev` /
+      `charlie.kelly@paddys.bar`, JIT-provisioned through the normal
+      `get_current_db_user` path with no special-casing needed.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: code complete; follow-up items below (1.7-1.9)
+**Status**: code complete
 
 - [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
 - [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
@@ -245,26 +239,26 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       pop-up modal where the user can select an account to move the bill to; once applied
       the bills list is updated to show the current list of bills sans the bill that was
       moved.
-- [ ] 1.7 Recurrence-specific config UI for the bill form — **not yet designed, scope
-      before starting**. Today `createBill` never sends `recurrence_config`
-      (`frontend/src/routes/(app)/accounts/[id]/+page.svelte`), so every bill gets created
-      with an empty `{}` regardless of type, even though the model needs type-specific data:
-      `{"interval_days": N}` (custom_days), `{"days": [10, 25]}` (semimonthly),
-      `{"day_of_month": N}` (monthly), and likely a weekday (weekly/biweekly) or month+day
-      (annually). Needs per-type conditional form fields on both create and edit. Blocks
-      exercising Phase 2's forecast engine end-to-end against real user-created bills of
-      non-trivial recurrence types.
-- [ ] 1.8 Bills CSV import/export per bank account. Backend: add account-scoped export and
-      import endpoints for the full bills list, with validation/error reporting granular
-      enough for a user-edited CSV. Frontend: add import/export actions on the bills page
-      for the current account, with a downloadable template/example. CSV should stay
-      human-readable and spreadsheet-friendly (Excel/Numbers), especially for money:
-      amounts should be rendered and accepted in the selected display currency (default
-      USD), while the backend continues storing normalized cents.
-- [ ] 1.9 Bill notes support. Backend: extend `bills` schema + create/update/read endpoints with
-      optional `notes` text (`NULL`/empty allowed). Frontend: add notes field to bill create/edit
-      form and display in the bills table/detail affordance. Notes are persistent bill metadata
-      and apply to all future cycles for that bill.
+- [x] 1.7 Recurrence-specific config UI for the bill form, on both create and a new bill
+      edit modal (none existed before - the roadmap's "on both create and edit" phrasing
+      meant building one). New shared `RecurrenceConfigFields.svelte` renders per-type
+      fields (nothing for weekly/biweekly/monthly/annually; two 1-31 day inputs defaulting
+      to `[10, 25]` for semimonthly; one interval input defaulting to 30 for custom_days)
+      and both the create form and edit modal now actually send `recurrence_config`
+      (previously always omitted). Also rebuilt `Select.svelte` as a custom Tailwind
+      popover listbox (mirroring `DatePicker.svelte`'s pattern) instead of a native
+      `<select>`, since this item needed more per-type fields on top of it.
+- [x] 1.8 Bills CSV import/export per bank account. Backend: `GET/POST
+      .../bills/{export,import}` (`backend/src/bills_csv.py`, `backend/src/api/bills.py`) -
+      dollars not cents, `semimonthly_days`/`custom_interval_days` as their own columns
+      instead of raw JSON, all-or-nothing import validation (a 422 with a per-row error
+      list if any row fails, nothing inserted). Frontend: Import/Export buttons on the
+      bills page (`frontend/src/lib/api/bills.ts`'s `exportBillsCsv`/`importBillsCsv`, via
+      `apiFetch` directly rather than `apiJson` since a CSV blob/multipart upload isn't
+      JSON).
+- [x] 1.9 Bill notes support. `Bill.notes` (nullable, migration `12aa348bb14f`), threaded
+      through `BillCreate`/`Update`/`Read` and the create form + edit modal (no dedicated
+      bills-table column, to avoid clutter - the edit modal is the "detail affordance").
 
 ## Phase 2 — Forecast Engine
 
@@ -526,3 +520,17 @@ session (or a fresh Claude Code instance) orient in under a minute.
   Tally-specific vocabulary), and 4.6 (a real logged-out homepage with an interactive,
   no-login forecast demo reusing the real engine via a new public endpoint). Next: 1.7,
   Phase 4, or any of the newly-logged follow-ups.
+- 2026-07-12: Shipped the Phase 0/1 follow-up items in one PR: 0.6 (dev auth bypass), 1.7
+  (recurrence-config UI + the first bill edit modal), 1.8 (CSV import/export), and 1.9
+  (bill notes) - plus rebuilding `Select.svelte` as a custom Tailwind dropdown (a
+  standalone request that landed alongside 1.7 since that item needed more per-type
+  select/number fields on top of it). Verified end-to-end in a real browser via the new
+  dev-auth-bypass flow (Playwright, headless). Also fixed an unrelated production bug
+  first this session: SPA deep-link refreshes (e.g. `/dashboard`) were returning a raw S3
+  `AccessDenied` XML instead of the app, because CloudFront's OAC-protected S3 origin
+  returns 403 (not 404) for a missing key and the S3 bucket's `error_document` setting
+  never applied (it only works on S3's website endpoint, which OAC doesn't use) - fixed
+  with `custom_error_response` blocks on the CloudFront distribution (PR #90). Next: Phase
+  3 cycle reconciliation (3.5-3.11 - `cycle_overrides` data model/migration, CRUD, forecast
+  engine integration, active-cycle frontend controls, reconciliation summary, bill
+  history), or any Phase 4 item.

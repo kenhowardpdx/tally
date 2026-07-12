@@ -58,6 +58,12 @@ def _fetch_jwks_or_503(force_refresh: bool = False) -> dict:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
+    if settings.dev_auth_bypass:
+        # Local dev only (see Settings.dev_auth_bypass) - skips JWKS/jose
+        # entirely and returns a fixed identity, JIT-provisioned the same way
+        # a real Auth0 user would be (get_current_db_user only relies on
+        # `sub`/`email`, both present here).
+        return {"sub": "auth0|charlie_kelly_dev", "email": "charlie.kelly@paddys.bar"}
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"

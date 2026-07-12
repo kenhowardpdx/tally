@@ -38,6 +38,7 @@ export interface Bill {
 	start_date: string;
 	end_date: string | null;
 	enabled: boolean;
+	notes: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -50,6 +51,7 @@ export interface BillInput {
 	start_date: string;
 	end_date?: string | null;
 	enabled?: boolean;
+	notes?: string | null;
 }
 
 export interface Transaction {

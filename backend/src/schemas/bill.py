@@ -13,6 +13,7 @@ class BillCreate(BaseModel):
     start_date: date
     end_date: date | None = None
     enabled: bool = True
+    notes: str | None = None
 
 
 class BillUpdate(BaseModel):
@@ -24,6 +25,7 @@ class BillUpdate(BaseModel):
     end_date: date | None = None
     enabled: bool | None = None
     account_id: int | None = None
+    notes: str | None = None
 
 
 class BillRead(BaseModel):
@@ -38,5 +40,6 @@ class BillRead(BaseModel):
     start_date: date
     end_date: date | None
     enabled: bool
+    notes: str | None
     created_at: datetime
     updated_at: datetime

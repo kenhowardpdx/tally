@@ -31,4 +31,5 @@ development guide, including testing GitHub Actions workflows locally with `act`
 
 - [Development Guide](docs/DEVELOPING.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Branding](docs/BRANDING.md)
 - [Infrastructure](infra/README.md)

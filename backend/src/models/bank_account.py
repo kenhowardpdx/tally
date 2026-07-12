@@ -1,9 +1,17 @@
-from datetime import datetime
+import enum
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, Date, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
+
+
+class CycleType(str, enum.Enum):
+    WEEKLY = "weekly"
+    BIWEEKLY = "biweekly"
+    MONTHLY = "monthly"
+    SEMIMONTHLY = "semimonthly"
 
 
 class BankAccount(Base):
@@ -18,6 +26,23 @@ class BankAccount(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    # Last-used forecast settings, persisted so revisiting the forecast page
+    # doesn't require re-entering the starting balance/date range every time -
+    # pay cycles are ~2 weeks apart and users check back on the same cycle
+    # repeatedly. Set as a side effect of POST .../forecast, not editable
+    # directly (no equivalent field on BankAccountUpdate).
+    forecast_starting_balance_cents: Mapped[int | None] = mapped_column(BigInteger)
+    forecast_income_per_cycle_cents: Mapped[int | None] = mapped_column(BigInteger)
+    forecast_cycle_type: Mapped[CycleType | None] = mapped_column(
+        Enum(
+            CycleType,
+            name="cycle_type",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        )
+    )
+    forecast_start_date: Mapped[date | None] = mapped_column(Date)
+    forecast_end_date: Mapped[date | None] = mapped_column(Date)
 
     user: Mapped["User"] = relationship(back_populates="bank_accounts")
     bills: Mapped[list["Bill"]] = relationship(

@@ -5,7 +5,8 @@
 		type = 'text',
 		placeholder,
 		required = false,
-		id
+		id,
+		step
 	}: {
 		label?: string;
 		value?: string;
@@ -13,6 +14,7 @@
 		placeholder?: string;
 		required?: boolean;
 		id?: string;
+		step?: string;
 	} = $props();
 
 	const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
@@ -27,6 +29,7 @@
 		{type}
 		{placeholder}
 		{required}
+		{step}
 		bind:value
 		class="rounded-card border border-slate-300 px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
 	/>

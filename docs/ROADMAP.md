@@ -151,7 +151,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 0 — Foundations
 
-**Status**: code complete
+**Status**: code complete; one follow-up item below (0.6)
 
 - [x] 0.1 Finalize data model (turn the sketch above into real SQLAlchemy models + an ER
       diagram in this doc)
@@ -170,6 +170,19 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       `PUBLIC_AUTH0_CLIENT_ID`/`PUBLIC_AUTH0_AUDIENCE` filled in `frontend/.env` (see
       `frontend/.env.example`), and the dev URL (`http://localhost:5173`) added as an
       Allowed Callback/Logout/Web Origin URL in the Auth0 SPA application settings.
+- [ ] 0.6 Local dev auth bypass: an opt-in flag (env var, off by default) that skips real
+      Auth0 token validation entirely and JIT-provisions a fixed dummy user, so
+      `docker compose up` can be exercised end-to-end (including by an AI coding
+      assistant in a sandboxed environment) without a real Auth0 login. Dummy identity
+      themed as an It's Always Sunny in Philadelphia character, with an email-shaped
+      display name - e.g. `charlie.kelly@paddys.bar` - close enough to a real Auth0
+      `sub`/`email` claim pair that `get_current_db_user`'s JIT-provisioning path
+      (`backend/src/api/deps.py`) needs no special-casing for it. Backend:
+      short-circuit `get_current_user` (`backend/src/core/auth.py`) when the bypass flag
+      is set, skipping the JWKS fetch/JWT decode entirely. Frontend: skip the Auth0 SPA
+      redirect (`frontend/src/lib/auth.ts`) the same way, so login is instant locally.
+      **Must never be reachable in prod** - gate behind an explicit env var checked at
+      startup, never a request header/query param a client could set.
 
 ## Phase 1 — Accounts & Bills CRUD
 
@@ -250,20 +263,45 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 3 — Transactions & Windfalls
 
-**Status**: not started
+**Status**: code complete
 
-- [ ] 3.1 Backend: one-off `transactions` CRUD, folded into the forecast calculation
-      alongside recurring bills
-- [ ] 3.2 Frontend: add/manage one-off transactions UI
-- [ ] 3.3 Backend: `windfalls` CRUD (future one-time income), folded into forecast
-- [ ] 3.4 Frontend: windfall entry UI, forecast visualization highlighting windfall
-      impact on the running balance
+- [x] 3.1 Backend: one-off `transactions` CRUD (`backend/src/api/transactions.py`),
+      folded into the forecast calculation alongside recurring bills
+      (`backend/src/forecast/`). `Transaction.amount_cents` is **signed** (positive
+      credits, negative debits) — unlike `Bill` (always a positive expense) or
+      `Windfall` (always positive income), a one-off transaction is general-purpose.
+      `Cycle`/`get_forecast` gained a combined `net_cents` per cycle
+      (`transactions_total + windfalls_total - bills_total`); the tables already existed
+      from Phase 0's initial migration, so no new migration was needed.
+- [x] 3.2 Frontend: `/accounts/[id]/transactions` — list/create/delete, matching the
+      bills page's original (pre-1.5/1.6) depth.
+- [x] 3.3 Backend: `windfalls` CRUD (`backend/src/api/windfalls.py`), folded into
+      forecast the same way — always a positive credit.
+- [x] 3.4 Frontend: `/accounts/[id]/windfalls` entry UI; the forecast page's expanded
+      cycle rows now also list transaction and windfall line items alongside bills,
+      windfalls visually distinguished with a badge (the one thing in a forecast that's
+      unambiguously good news). Added a shared `AccountNav` component
+      (`frontend/src/lib/components/AccountNav.svelte`) across all four per-account pages
+      (Bills/Transactions/Windfalls/Forecast) — the old one-off "← Accounts"/"Forecast →"
+      links didn't scale past two sibling pages.
 
 ## Phase 4 — Multi-account dashboard & polish
 
 **Status**: not started
 
-- [ ] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views)
+- [ ] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views).
+      Per account, a "current cycle" snapshot card: the pay cycle containing today (date
+      range, bills due, running balance) at a glance, linking through to the full forecast
+      page for that account. Reuses the forecast engine (`backend/src/forecast/`) rather
+      than new logic - the open question is how to correctly identify "the cycle
+      containing today" for cycle types that don't self-anchor (weekly/biweekly/monthly
+      only snap to whatever `start_date` a request gives them, unlike semimonthly's fixed
+      10th/25th boundaries - see `engine.py`'s `_cycle_bounds`), starting from the
+      account's saved `forecast_start_date`/`forecast_cycle_type`
+      (`BankAccount.forecast_*`, persisted since Phase 2.3) and stepping forward/backward
+      to the cycle that actually contains today, rather than naively calling
+      `get_forecast(start_date=today, end_date=today, ...)` (which would anchor a new
+      cycle AT today instead of finding the in-progress one).
 - [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout. Still open:
       general responsive layout pass, plus whatever else turns up. Done so far:
       - [x] a real date-picker component (`frontend/src/lib/components/DatePicker.svelte`,
@@ -276,6 +314,23 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
         used in both the dropdown and the bills table
 - [ ] 4.3 Error handling, loading states, empty states throughout
 - [ ] 4.4 Test coverage: forecast engine (pytest), key frontend components
+- [ ] 4.5 In-app help: a glossary/definitions page explaining Tally-specific terms (Cycle
+      Type, Frequency, Windfall, the semimonthly 10th/25th convention, etc. — the concepts
+      this app introduces that aren't self-explanatory from the UI alone), plus contextual
+      tooltips on the fields that use this vocabulary (the bill form's Frequency select,
+      the forecast form's Cycle select, the windfall form) so users get the definition in
+      the moment instead of leaving the page to look it up. No tooltip component exists
+      yet (`frontend/src/lib/components/`) — needs a small reusable one, hover/focus
+      triggered and keyboard accessible.
+- [ ] 4.6 Logged-out homepage: replace the current placeholder root page
+      (`frontend/src/routes/+page.svelte`, currently just a couple of sentences before
+      redirecting authenticated users to `/accounts`) with real marketing content — what
+      Tally is, why to sign up — plus an interactive demo: a pre-selected sample list of
+      bills the visitor can add to (and remove from) and immediately see the effect on a
+      forecast, no login required. Needs a public, unauthenticated forecast endpoint that
+      reuses `backend/src/forecast/get_forecast` directly against demo data in the request
+      (no DB writes, no account, no auth) rather than reimplementing the engine in JS for
+      the demo — keeps the demo's math guaranteed identical to the real product's.
 
 ## Phase 5 — Production hardening (ongoing, lower priority)
 
@@ -364,3 +419,15 @@ session (or a fresh Claude Code instance) orient in under a minute.
   or just persisted somewhere this port doesn't have yet. 1.7 (recurrence-config UI) is
   still open and still blocks semimonthly/custom_days bills from being real (they show up
   as "unscheduled" in any forecast). Next: 1.7, or Phase 3 (transactions & windfalls).
+- 2026-07-12: Phase 3 (transactions & windfalls) shipped — both CRUD'd
+  (`backend/src/api/{transactions,windfalls}.py`) and folded into the forecast engine via
+  a new per-cycle `net_cents` (transactions signed, windfalls always positive, bills
+  always subtracted); new `/accounts/[id]/{transactions,windfalls}` pages, and a shared
+  `AccountNav` component across all four per-account pages now that there are four
+  siblings instead of two. Tables already existed from Phase 0, so no new migration.
+  Also logged four follow-up items to the roadmap this session: 0.6 (local dev Auth0
+  bypass, It's Always Sunny themed dummy user), 4.1's dashboard now specs a per-account
+  "current cycle" snapshot card, 4.5 (in-app glossary + field tooltips for
+  Tally-specific vocabulary), and 4.6 (a real logged-out homepage with an interactive,
+  no-login forecast demo reusing the real engine via a new public endpoint). Next: 1.7,
+  Phase 4, or any of the newly-logged follow-ups.

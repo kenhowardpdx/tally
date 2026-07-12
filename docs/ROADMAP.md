@@ -147,7 +147,7 @@ erDiagram
     }
 ```
 
-Maps directly to the 8 differences: `users.auth0_sub` → auth; `bank_accounts` → multi-account;
+Maps directly to the differences above: `users.auth0_sub` → auth; `bank_accounts` → multi-account;
 whole schema → Postgres; `bills.enabled` → enable/disable; `recurrence_type`/`recurrence_config`
 → finer intervals; `transactions` → one-off entries; `windfalls` → future windfalls.
 `cycle_overrides` → per-cycle reconciliation snapshots (see Phase 3, items 3.5–3.9).

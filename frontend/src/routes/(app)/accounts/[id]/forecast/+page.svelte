@@ -3,6 +3,7 @@
 	import { getAccount } from '$lib/api/accounts';
 	import { computeForecast } from '$lib/api/forecast';
 	import type { BankAccount, CycleType, ForecastResponse } from '$lib/api/types';
+	import AccountNav from '$lib/components/AccountNav.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import DatePicker from '$lib/components/DatePicker.svelte';
@@ -110,7 +111,7 @@
 	}
 </script>
 
-<a class="text-sm text-primary underline" href="/accounts/{accountId}">&larr; Bills</a>
+<AccountNav {accountId} current="forecast" />
 <h1 class="mt-2 text-2xl font-semibold text-text">
 	Forecast{#if account}
 		({account.name}{#if account.institution} - {account.institution}{/if}){/if}
@@ -167,7 +168,8 @@
 			</thead>
 			<tbody>
 				{#each forecast.cycles as cycle (cycle.start_date)}
-					{@const clickable = cycle.bills.length > 0}
+					{@const clickable =
+						cycle.bills.length > 0 || cycle.transactions.length > 0 || cycle.windfalls.length > 0}
 					<tr class="border-b border-slate-100 last:border-0 {rowClass(cycle.running_balance_cents)}">
 						{#if clickable}
 							<td class="p-0" colspan="3">
@@ -187,11 +189,40 @@
 						{/if}
 					</tr>
 					{#if expanded[cycle.start_date]}
-						{#each cycle.bills as bill (`${bill.bill_id}-${bill.due_date}`)}
+						{#each cycle.bills as bill (`bill-${bill.bill_id}-${bill.due_date}`)}
 							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
 								<td class="px-4 py-2 pl-8">{bill.due_date}</td>
 								<td class="px-4 py-2">{bill.name}</td>
 								<td class="px-4 py-2 text-right">{formatAmount(bill.amount_cents)}</td>
+							</tr>
+						{/each}
+						{#each cycle.transactions as transaction (`transaction-${transaction.transaction_id}`)}
+							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+								<td class="px-4 py-2 pl-8">{transaction.date}</td>
+								<td class="px-4 py-2">{transaction.description ?? 'Transaction'}</td>
+								<td
+									class="px-4 py-2 text-right {transaction.amount_cents < 0
+										? ''
+										: 'text-emerald-700'}"
+								>
+									{formatAmount(transaction.amount_cents)}
+								</td>
+							</tr>
+						{/each}
+						{#each cycle.windfalls as windfall (`windfall-${windfall.windfall_id}`)}
+							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+								<td class="px-4 py-2 pl-8">{windfall.expected_date}</td>
+								<td class="px-4 py-2">
+									<span
+										class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+									>
+										Windfall
+									</span>
+									{windfall.name}
+								</td>
+								<td class="px-4 py-2 text-right text-emerald-700">
+									{formatAmount(windfall.amount_cents)}
+								</td>
 							</tr>
 						{/each}
 					{/if}

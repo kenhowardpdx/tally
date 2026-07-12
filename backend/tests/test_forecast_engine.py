@@ -29,7 +29,14 @@ from datetime import date
 
 import pytest
 
-from src.forecast import ForecastBill, MissingRecurrenceConfig, build_cycle, get_forecast
+from src.forecast import (
+    ForecastBill,
+    ForecastTransaction,
+    ForecastWindfall,
+    MissingRecurrenceConfig,
+    build_cycle,
+    get_forecast,
+)
 from src.forecast.bill import occurrences_in_range, validate_recurrence_config
 from src.models.bank_account import CycleType
 from src.models.bill import RecurrenceType
@@ -180,11 +187,16 @@ class TestCycleGoldenValue:
             make_bill(2, "bill two", 1525, date(1985, 10, 22)),
             make_bill(3, "bill three", 1525, date(1985, 10, 23)),
         ]
-        cycle_one = build_cycle(bills, date(1985, 10, 21), date(1985, 10, 28))
-        cycle_two = build_cycle(bills, date(1985, 11, 21), date(1985, 11, 28))
+        cycle_one = build_cycle(bills, [], [], date(1985, 10, 21), date(1985, 10, 28))
+        cycle_two = build_cycle(bills, [], [], date(1985, 11, 21), date(1985, 11, 28))
 
         assert len(cycle_one.bills) != len(cycle_two.bills)
-        assert cycle_one.sum_cents + cycle_two.sum_cents == 7625
+        # net_cents is negative for bills-only cycles (bills are expenses,
+        # subtracted) - the reference's golden value (-76.25, its bills are
+        # stored pre-negated) matches this sign directly, unlike the other
+        # ported fixtures which had to flip sign for Tally's positive-amount
+        # convention.
+        assert cycle_one.net_cents + cycle_two.net_cents == -7625
 
 
 class TestDueDateMonthEndClamping:
@@ -268,3 +280,59 @@ class TestGetForecastValidation:
         # there) - a forecast for a single day should still show that day.
         result = get_forecast([], CycleType.MONTHLY, date(2024, 1, 1), date(2024, 1, 1), 0, 0)
         assert len(result.cycles) == 1
+
+
+class TestGetForecastTransactionsAndWindfalls:
+    def test_windfall_adds_to_running_balance(self):
+        windfall = ForecastWindfall(id=1, name="tax refund", amount_cents=50000, expected_date=date(2024, 1, 15))
+        result = get_forecast(
+            [], CycleType.MONTHLY, date(2024, 1, 1), date(2024, 1, 31), 0, 0, windfalls=[windfall]
+        )
+        assert len(result.cycles[0].windfalls) == 1
+        assert result.cycles[0].net_cents == 50000
+        assert result.ending_balance_cents == 50000
+
+    def test_positive_transaction_credits_negative_transaction_debits(self):
+        credit = ForecastTransaction(id=1, amount_cents=10000, date=date(2024, 1, 5), description="refund")
+        debit = ForecastTransaction(id=2, amount_cents=-3000, date=date(2024, 1, 10), description="oops")
+        result = get_forecast(
+            [], CycleType.MONTHLY, date(2024, 1, 1), date(2024, 1, 31), 0, 0, transactions=[credit, debit]
+        )
+        assert len(result.cycles[0].transactions) == 2
+        assert result.cycles[0].net_cents == 7000
+        assert result.ending_balance_cents == 7000
+
+    def test_bills_transactions_and_windfalls_combine_in_one_cycle(self):
+        bill = make_bill(1, "rent", 150000, date(2024, 1, 1))
+        transaction = ForecastTransaction(id=1, amount_cents=-2000, date=date(2024, 1, 10), description=None)
+        windfall = ForecastWindfall(id=1, name="bonus", amount_cents=100000, expected_date=date(2024, 1, 20))
+        result = get_forecast(
+            [bill],
+            CycleType.MONTHLY,
+            date(2024, 1, 1),
+            date(2024, 1, 31),
+            0,
+            0,
+            transactions=[transaction],
+            windfalls=[windfall],
+        )
+        # -150000 (bill) - 2000 (transaction) + 100000 (windfall)
+        assert result.cycles[0].net_cents == -52000
+        assert result.ending_balance_cents == -52000
+
+    def test_transaction_and_windfall_outside_cycle_window_excluded(self):
+        transaction = ForecastTransaction(id=1, amount_cents=10000, date=date(2024, 2, 1), description=None)
+        windfall = ForecastWindfall(id=1, name="late", amount_cents=5000, expected_date=date(2024, 2, 1))
+        result = get_forecast(
+            [],
+            CycleType.MONTHLY,
+            date(2024, 1, 1),
+            date(2024, 1, 31),
+            0,
+            0,
+            transactions=[transaction],
+            windfalls=[windfall],
+        )
+        assert result.cycles[0].transactions == []
+        assert result.cycles[0].windfalls == []
+        assert result.cycles[0].net_cents == 0

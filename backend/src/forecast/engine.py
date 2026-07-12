@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from src.forecast.bill import ForecastBill, validate_recurrence_config
-from src.forecast.cycle import CycleBillLine, build_cycle
+from src.forecast.cycle import (
+    CycleBillLine,
+    CycleTransactionLine,
+    CycleWindfallLine,
+    build_cycle,
+)
+from src.forecast.transaction import ForecastTransaction
+from src.forecast.windfall import ForecastWindfall
 from src.models.bank_account import CycleType
 
 
@@ -21,7 +28,9 @@ class ForecastCycle:
     start_date: date
     end_date: date
     bills: list[CycleBillLine]
-    cycle_sum_cents: int
+    transactions: list[CycleTransactionLine]
+    windfalls: list[CycleWindfallLine]
+    net_cents: int
     running_balance_cents: int
 
 
@@ -89,9 +98,14 @@ def get_forecast(
     end_date: date,
     starting_balance_cents: int,
     income_per_cycle_cents: int,
+    transactions: list[ForecastTransaction] | None = None,
+    windfalls: list[ForecastWindfall] | None = None,
 ) -> ForecastResult:
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
+
+    transactions = transactions or []
+    windfalls = windfalls or []
 
     schedulable: list[ForecastBill] = []
     unscheduled: list[UnscheduledBill] = []
@@ -108,17 +122,16 @@ def get_forecast(
 
     while current_start <= end_date:
         current_end, next_start = _cycle_bounds(cycle_type, current_start)
-        cycle = build_cycle(schedulable, current_start, current_end)
-        # Bills are stored (and displayed) as positive amounts throughout Tally
-        # (see Bill.amount_cents) - unlike the reference engine, which stores
-        # bill amounts pre-negated, so cycle sums subtract here instead of add.
-        running_balance += income_per_cycle_cents - cycle.sum_cents
+        cycle = build_cycle(schedulable, transactions, windfalls, current_start, current_end)
+        running_balance += income_per_cycle_cents + cycle.net_cents
         cycles.append(
             ForecastCycle(
                 start_date=current_start,
                 end_date=current_end,
                 bills=cycle.bills,
-                cycle_sum_cents=cycle.sum_cents,
+                transactions=cycle.transactions,
+                windfalls=cycle.windfalls,
+                net_cents=cycle.net_cents,
                 running_balance_cents=running_balance,
             )
         )

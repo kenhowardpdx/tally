@@ -139,11 +139,11 @@
 		/>
 		<DatePicker label="Start date" bind:value={startDate} />
 		<DatePicker label="End date" bind:value={endDate} />
-		<Select label="Cycle" bind:value={cycleType}>
-			{#each cycleTypeOptions as option (option)}
-				<option value={option}>{cycleTypeLabels[option]}</option>
-			{/each}
-		</Select>
+		<Select
+			label="Cycle"
+			bind:value={cycleType}
+			options={cycleTypeOptions.map((option) => ({ value: option, label: cycleTypeLabels[option] }))}
+		/>
 		<Button type="submit" disabled={calculating || loading}>Calculate</Button>
 	</form>
 </Card>

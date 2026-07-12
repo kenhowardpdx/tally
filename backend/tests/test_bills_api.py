@@ -48,6 +48,64 @@ async def test_create_and_list_bills(client: AsyncClient):
     assert len(res.json()) == 1
 
 
+async def test_create_bill_rejects_notes_over_max_length(client: AsyncClient):
+    account = await _create_account(client)
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills",
+        json=_bill_payload(notes="x" * 1001),
+    )
+    assert res.status_code == 422
+
+
+async def test_create_bill_rejects_invalid_recurrence_config(client: AsyncClient):
+    account = await _create_account(client)
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills",
+        json=_bill_payload(recurrence_type="custom_days", recurrence_config={}),
+    )
+    assert res.status_code == 422
+    assert "interval_days" in res.json()["detail"]
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.json() == []
+
+
+async def test_update_bill_rejects_invalid_recurrence_config(client: AsyncClient):
+    account = await _create_account(client)
+    bill = (
+        await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}",
+        json={"recurrence_type": "semimonthly"},
+    )
+    assert res.status_code == 422
+    assert "days" in res.json()["detail"]
+
+
+async def test_update_bill_unrelated_field_keeps_existing_valid_recurrence_config(
+    client: AsyncClient,
+):
+    account = await _create_account(client)
+    bill = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/bills",
+            json=_bill_payload(recurrence_type="semimonthly", recurrence_config={"days": [10, 25]}),
+        )
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}",
+        json={"amount_cents": 99999},
+    )
+    assert res.status_code == 200
+    assert res.json()["amount_cents"] == 99999
+    assert res.json()["recurrence_config"] == {"days": [10, 25]}
+
+
 async def test_toggle_bill_enabled(client: AsyncClient):
     account = await _create_account(client)
     bill = (
@@ -120,4 +178,88 @@ async def test_bills_scoped_to_account_owner(client: AsyncClient):
     assert res.status_code == 404
 
     res = await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    assert res.status_code == 404
+
+
+async def test_export_bills_returns_csv(client: AsyncClient):
+    account = await _create_account(client)
+    await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills/export")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    assert "attachment" in res.headers["content-disposition"]
+    lines = res.text.strip().splitlines()
+    assert len(lines) == 2  # header + one bill
+    assert "Rent" in lines[1]
+    assert "1500.00" in lines[1]
+
+
+async def test_export_bills_scoped_to_account_owner(client: AsyncClient):
+    account = await _create_account(client)
+    await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+
+    _login_as("auth0|someone-else")
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills/export")
+    assert res.status_code == 404
+
+
+async def test_import_bills_creates_all_rows(client: AsyncClient):
+    account = await _create_account(client)
+    csv_text = (
+        "name,amount,recurrence_type,semimonthly_days,custom_interval_days,"
+        "start_date,end_date,enabled,notes\n"
+        "Rent,1500.00,monthly,,,2026-01-01,,true,\n"
+        "Paycheck buffer,50.00,semimonthly,\"10,25\",,2026-01-01,,true,imported\n"
+    )
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills/import",
+        files={"file": ("bills.csv", csv_text, "text/csv")},
+    )
+    assert res.status_code == 201
+    body = res.json()
+    assert len(body) == 2
+    assert {b["name"] for b in body} == {"Rent", "Paycheck buffer"}
+    semimonthly = next(b for b in body if b["name"] == "Paycheck buffer")
+    assert semimonthly["recurrence_config"] == {"days": [10, 25]}
+    assert semimonthly["notes"] == "imported"
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert len(res.json()) == 2
+
+
+async def test_import_bills_is_all_or_nothing_on_a_bad_row(client: AsyncClient):
+    account = await _create_account(client)
+    csv_text = (
+        "name,amount,recurrence_type,semimonthly_days,custom_interval_days,"
+        "start_date,end_date,enabled,notes\n"
+        "Rent,1500.00,monthly,,,2026-01-01,,true,\n"
+        ",50.00,monthly,,,2026-01-01,,true,\n"
+    )
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills/import",
+        files={"file": ("bills.csv", csv_text, "text/csv")},
+    )
+    assert res.status_code == 422
+    errors = res.json()["detail"]["errors"]
+    assert len(errors) == 1
+    assert errors[0]["row"] == 3
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.json() == []
+
+
+async def test_import_bills_scoped_to_account_owner(client: AsyncClient):
+    account = await _create_account(client)
+    csv_text = (
+        "name,amount,recurrence_type,semimonthly_days,custom_interval_days,"
+        "start_date,end_date,enabled,notes\n"
+        "Rent,1500.00,monthly,,,2026-01-01,,true,\n"
+    )
+
+    _login_as("auth0|someone-else")
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills/import",
+        files={"file": ("bills.csv", csv_text, "text/csv")},
+    )
     assert res.status_code == 404

@@ -3,10 +3,17 @@ import { goto } from '$app/navigation';
 import {
 	PUBLIC_AUTH0_AUDIENCE,
 	PUBLIC_AUTH0_CLIENT_ID,
-	PUBLIC_AUTH0_DOMAIN
+	PUBLIC_AUTH0_DOMAIN,
+	PUBLIC_DEV_AUTH_BYPASS
 } from '$env/static/public';
 import { Auth0Client, type User } from '@auth0/auth0-spa-js';
 import { writable } from 'svelte/store';
+
+// Must match the backend's dev_auth_bypass dummy identity (see
+// get_current_user in backend/src/core/auth.py) — never true in a deployed
+// environment (see PUBLIC_DEV_AUTH_BYPASS in .env.example).
+const DEV_AUTH_BYPASS = PUBLIC_DEV_AUTH_BYPASS === 'true';
+const DEV_USER = { sub: 'auth0|charlie_kelly_dev', email: 'charlie.kelly@paddys.bar' } as User;
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -33,6 +40,13 @@ function getClient(): Auth0Client {
 // (this app is a static SPA — see svelte.config.js's adapter-static).
 export async function initAuth(): Promise<void> {
 	if (!browser) return;
+
+	if (DEV_AUTH_BYPASS) {
+		isAuthenticated.set(true);
+		user.set(DEV_USER);
+		isLoading.set(false);
+		return;
+	}
 
 	try {
 		const auth0 = getClient();
@@ -62,6 +76,16 @@ export async function initAuth(): Promise<void> {
 
 export async function login(redirectTo?: string): Promise<void> {
 	if (!browser) return;
+	if (DEV_AUTH_BYPASS) {
+		// Restores the dummy identity rather than no-op'ing - logout() (below)
+		// sets isAuthenticated=false with no real session to redirect through,
+		// and the (app)/+layout.svelte guard calls login() to recover from
+		// exactly that state, so a no-op here would leave the app permanently
+		// stuck unauthenticated after a bypass logout.
+		isAuthenticated.set(true);
+		user.set(DEV_USER);
+		return;
+	}
 	try {
 		const targetRedirect = redirectTo ?? window.location.pathname;
 		// No authorizationParams override here - the constructor's (redirect_uri,
@@ -81,6 +105,11 @@ export async function login(redirectTo?: string): Promise<void> {
 
 export async function logout(): Promise<void> {
 	if (!browser) return;
+	if (DEV_AUTH_BYPASS) {
+		isAuthenticated.set(false);
+		user.set(undefined);
+		return;
+	}
 	try {
 		await getClient().logout({ logoutParams: { returnTo: window.location.origin } });
 	} catch (err) {
@@ -90,5 +119,6 @@ export async function logout(): Promise<void> {
 
 export async function getAccessToken(): Promise<string> {
 	if (!browser) throw new Error('getAccessToken() can only be called in the browser');
+	if (DEV_AUTH_BYPASS) return 'dev-bypass-token'; // never inspected by the backend bypass
 	return getClient().getTokenSilently();
 }

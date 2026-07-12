@@ -47,6 +47,15 @@ def _make_token(private_pem: bytes, **claim_overrides) -> str:
     return jwt.encode(claims, private_pem, algorithm="RS256")
 
 
+def test_get_current_user_bypasses_validation_when_dev_auth_bypass_is_set(monkeypatch):
+    monkeypatch.setattr(settings, "dev_auth_bypass", True)
+
+    payload = auth.get_current_user(None)
+
+    assert payload["sub"] == "auth0|charlie_kelly_dev"
+    assert payload["email"] == "charlie.kelly@paddys.bar"
+
+
 def test_get_current_user_rejects_missing_credentials_with_401():
     # HTTPBearer(auto_error=False) passes None here when the Authorization
     # header is absent - get_current_user must handle that itself rather than

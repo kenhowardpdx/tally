@@ -1,8 +1,12 @@
+from datetime import date
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.auth import get_current_user
 from src.main import app
+from src.models import Bill, RecurrenceType
 from tests.conftest import auth_as
 
 
@@ -103,12 +107,25 @@ async def test_forecast_excludes_disabled_bills(client: AsyncClient):
     assert body["ending_balance_cents"] == 100000 + 200000 * 2
 
 
-async def test_forecast_reports_bills_missing_recurrence_config(client: AsyncClient):
+async def test_forecast_reports_bills_missing_recurrence_config(
+    client: AsyncClient, db_session: AsyncSession
+):
+    # create_bill now rejects a missing/invalid recurrence_config outright
+    # (422), so a bill can only end up in this state via data that predates
+    # that validation (or a direct DB write) - insert one directly to
+    # exercise the forecast engine's defensive unscheduled_bills handling.
     account = await _create_account(client)
-    await client.post(
-        f"/api/v1/accounts/{account['id']}/bills",
-        json=_bill_payload(recurrence_type="custom_days"),
+    bill = Bill(
+        account_id=account["id"],
+        name="Rent",
+        amount_cents=150000,
+        recurrence_type=RecurrenceType.CUSTOM_DAYS,
+        recurrence_config={},
+        start_date=date(2024, 1, 15),
+        enabled=True,
     )
+    db_session.add(bill)
+    await db_session.commit()
 
     res = await client.post(
         f"/api/v1/accounts/{account['id']}/forecast", json=_forecast_payload()

@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     auth0_domain: str = ""
     auth0_audience: str = ""
 
+    # Skips real Auth0 token validation entirely and JIT-provisions a fixed
+    # dummy user (see get_current_user) - lets `docker compose up` be
+    # exercised end-to-end without a real Auth0 login. Off by default; must
+    # never be set in a deployed environment (nothing in infra/ sets this).
+    dev_auth_bypass: bool = False
+
     @field_validator("database_url_readwrite")
     @classmethod
     def _normalize_for_asyncpg(cls, value: str) -> str:

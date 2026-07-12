@@ -6,11 +6,21 @@ export type RecurrenceType =
 	| 'annually'
 	| 'custom_days';
 
+// Pay-period cadence for forecasting - distinct from RecurrenceType (how
+// often a given bill recurs). Not persisted independently; lives only as
+// the account's last-used forecast setting (see BankAccount.forecast_*).
+export type CycleType = 'weekly' | 'biweekly' | 'monthly' | 'semimonthly';
+
 export interface BankAccount {
 	id: number;
 	name: string;
 	institution: string | null;
 	created_at: string;
+	forecast_starting_balance_cents: number | null;
+	forecast_income_per_cycle_cents: number | null;
+	forecast_cycle_type: CycleType | null;
+	forecast_start_date: string | null;
+	forecast_end_date: string | null;
 }
 
 export interface BankAccountInput {
@@ -40,4 +50,40 @@ export interface BillInput {
 	start_date: string;
 	end_date?: string | null;
 	enabled?: boolean;
+}
+
+export interface ForecastRequest {
+	start_date: string;
+	end_date: string;
+	starting_balance_cents: number;
+	income_per_cycle_cents: number;
+	cycle_type: CycleType;
+}
+
+export interface ForecastBillLine {
+	bill_id: number;
+	name: string;
+	amount_cents: number;
+	due_date: string;
+}
+
+export interface ForecastCycle {
+	start_date: string;
+	end_date: string;
+	bills: ForecastBillLine[];
+	cycle_sum_cents: number;
+	running_balance_cents: number;
+}
+
+export interface UnscheduledBill {
+	bill_id: number;
+	name: string;
+	reason: string;
+}
+
+export interface ForecastResponse {
+	cycles: ForecastCycle[];
+	starting_balance_cents: number;
+	ending_balance_cents: number;
+	unscheduled_bills: UnscheduledBill[];
 }

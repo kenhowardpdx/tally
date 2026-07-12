@@ -139,9 +139,12 @@
 </script>
 
 <a class="text-sm text-primary underline" href="/accounts">&larr; Accounts</a>
-<h1 class="mt-2 text-2xl font-semibold text-text">
-	Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
-</h1>
+<div class="mt-2 flex items-center justify-between">
+	<h1 class="text-2xl font-semibold text-text">
+		Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+	</h1>
+	<a class="text-sm text-primary underline" href="/accounts/{accountId}/forecast">Forecast &rarr;</a>
+</div>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>

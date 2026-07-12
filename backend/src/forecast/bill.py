@@ -40,19 +40,24 @@ def _clamp_day(year: int, month: int, day: int) -> int:
     return min(day, _last_day_of_month(year, month))
 
 
-def validate_recurrence_config(bill: ForecastBill) -> str | None:
-    """Returns a human-readable reason if `bill.recurrence_config` is missing data
-    required for its recurrence_type, else None."""
-    if bill.recurrence_type == RecurrenceType.SEMIMONTHLY:
-        days = bill.recurrence_config.get("days")
+def validate_recurrence_config(recurrence_type: RecurrenceType, recurrence_config: dict) -> str | None:
+    """Returns a human-readable reason if `recurrence_config` is missing data
+    required for `recurrence_type`, else None.
+
+    The single source of truth for this shape - callers outside the forecast
+    engine (bill create/update, CSV import) should call this directly rather
+    than re-deriving the same 1-31/positive-int rules.
+    """
+    if recurrence_type == RecurrenceType.SEMIMONTHLY:
+        days = recurrence_config.get("days")
         if (
             not isinstance(days, list)
             or not days
             or not all(isinstance(d, int) and 1 <= d <= 31 for d in days)
         ):
             return "semimonthly bills need recurrence_config.days as integers 1-31, e.g. [10, 25]"
-    if bill.recurrence_type == RecurrenceType.CUSTOM_DAYS:
-        interval = bill.recurrence_config.get("interval_days")
+    if recurrence_type == RecurrenceType.CUSTOM_DAYS:
+        interval = recurrence_config.get("interval_days")
         if not isinstance(interval, int) or interval <= 0:
             return "custom_days bills need recurrence_config.interval_days"
     return None
@@ -128,7 +133,7 @@ def occurrences_in_range(bill: ForecastBill, cycle_start: date, cycle_end: date)
     that's absent - callers iterating many bills should pre-filter with
     validate_recurrence_config instead of catching this per-call.
     """
-    reason = validate_recurrence_config(bill)
+    reason = validate_recurrence_config(bill.recurrence_type, bill.recurrence_config)
     if reason:
         raise MissingRecurrenceConfig(reason)
 

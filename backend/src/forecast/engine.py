@@ -141,7 +141,7 @@ def get_forecast(
     schedulable: list[ForecastBill] = []
     unscheduled: list[UnscheduledBill] = []
     for bill in bills:
-        reason = validate_recurrence_config(bill)
+        reason = validate_recurrence_config(bill.recurrence_type, bill.recurrence_config)
         if reason:
             unscheduled.append(UnscheduledBill(bill_id=bill.id, name=bill.name, reason=reason))
         else:

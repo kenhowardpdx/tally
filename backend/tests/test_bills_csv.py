@@ -95,7 +95,11 @@ class TestParseCsvRows:
 
         assert bills == []
         assert len(errors) == 1
-        assert "semimonthly_days" in errors[0].message
+        # Message now comes from the shared validate_recurrence_config
+        # (backend/src/forecast/bill.py), the same one the JSON create/update
+        # API path uses - "recurrence_config.days" rather than the CSV
+        # column name, but consistent across both paths.
+        assert "days" in errors[0].message
 
     def test_reports_the_bad_row_alongside_successfully_parsed_rows(self):
         # parse_csv_rows itself returns partial results (both the rows that

@@ -48,6 +48,64 @@ async def test_create_and_list_bills(client: AsyncClient):
     assert len(res.json()) == 1
 
 
+async def test_create_bill_rejects_notes_over_max_length(client: AsyncClient):
+    account = await _create_account(client)
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills",
+        json=_bill_payload(notes="x" * 1001),
+    )
+    assert res.status_code == 422
+
+
+async def test_create_bill_rejects_invalid_recurrence_config(client: AsyncClient):
+    account = await _create_account(client)
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/bills",
+        json=_bill_payload(recurrence_type="custom_days", recurrence_config={}),
+    )
+    assert res.status_code == 422
+    assert "interval_days" in res.json()["detail"]
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.json() == []
+
+
+async def test_update_bill_rejects_invalid_recurrence_config(client: AsyncClient):
+    account = await _create_account(client)
+    bill = (
+        await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}",
+        json={"recurrence_type": "semimonthly"},
+    )
+    assert res.status_code == 422
+    assert "days" in res.json()["detail"]
+
+
+async def test_update_bill_unrelated_field_keeps_existing_valid_recurrence_config(
+    client: AsyncClient,
+):
+    account = await _create_account(client)
+    bill = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/bills",
+            json=_bill_payload(recurrence_type="semimonthly", recurrence_config={"days": [10, 25]}),
+        )
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}",
+        json={"amount_cents": 99999},
+    )
+    assert res.status_code == 200
+    assert res.json()["amount_cents"] == 99999
+    assert res.json()["recurrence_config"] == {"days": [10, 25]}
+
+
 async def test_toggle_bill_enabled(client: AsyncClient):
     account = await _create_account(client)
     bill = (

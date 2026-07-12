@@ -48,7 +48,13 @@ export async function importBillsCsv(accountId: number, file: File): Promise<Bil
 		method: 'POST',
 		body: formData
 	});
-	const body = await res.json();
-	if (!res.ok) throw new ApiError(res.status, body);
-	return body;
+	if (!res.ok) {
+		// Mirrors apiJson's error-body handling: an error response isn't
+		// guaranteed to be JSON (e.g. a proxy's 502/504 page), so a raw
+		// res.json() here could throw a parse error instead of a clean
+		// ApiError.
+		const body = await res.json().catch(() => null);
+		throw new ApiError(res.status, body);
+	}
+	return res.json();
 }

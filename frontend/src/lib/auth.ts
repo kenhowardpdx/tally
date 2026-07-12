@@ -76,7 +76,16 @@ export async function initAuth(): Promise<void> {
 
 export async function login(redirectTo?: string): Promise<void> {
 	if (!browser) return;
-	if (DEV_AUTH_BYPASS) return; // already "logged in" via initAuth()
+	if (DEV_AUTH_BYPASS) {
+		// Restores the dummy identity rather than no-op'ing - logout() (below)
+		// sets isAuthenticated=false with no real session to redirect through,
+		// and the (app)/+layout.svelte guard calls login() to recover from
+		// exactly that state, so a no-op here would leave the app permanently
+		// stuck unauthenticated after a bypass logout.
+		isAuthenticated.set(true);
+		user.set(DEV_USER);
+		return;
+	}
 	try {
 		const targetRedirect = redirectTo ?? window.location.pathname;
 		// No authorizationParams override here - the constructor's (redirect_uri,

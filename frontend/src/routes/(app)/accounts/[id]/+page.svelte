@@ -49,6 +49,7 @@
 	let startDate = $state('');
 	let notes = $state('');
 	let creating = $state(false);
+	let recurrenceFieldsResetKey = $state(0);
 
 	let movingBill = $state<Bill | null>(null);
 	let moveTargetAccountId = $state('');
@@ -104,7 +105,10 @@
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
 		const amountCents = Math.round(Number(amount) * 100);
-		if (!name.trim() || !startDate || Number.isNaN(amountCents)) return;
+		if (!name.trim() || !startDate || Number.isNaN(amountCents)) {
+			error = 'Please fill out all required fields.';
+			return;
+		}
 		creating = true;
 		try {
 			await createBill(accountId, {
@@ -118,6 +122,11 @@
 			name = '';
 			amount = '';
 			recurrenceConfig = {};
+			// RecurrenceConfigFields only seeds its local day/interval inputs
+			// from recurrenceConfig once at mount - remounting it (via the
+			// {#key} block below) is what makes the reset above actually
+			// clear what's displayed, not just the value bound to the parent.
+			recurrenceFieldsResetKey += 1;
 			startDate = '';
 			notes = '';
 			await loadBills();
@@ -308,7 +317,9 @@
 			bind:value={recurrenceType}
 			options={recurrenceOptions.map((option) => ({ value: option, label: recurrenceLabels[option] }))}
 		/>
-		<RecurrenceConfigFields {recurrenceType} bind:recurrenceConfig />
+		{#key recurrenceFieldsResetKey}
+			<RecurrenceConfigFields {recurrenceType} bind:recurrenceConfig />
+		{/key}
 		<DatePicker label="Start date" bind:value={startDate} />
 		<Input label="Notes" bind:value={notes} placeholder="Optional" />
 		<Button type="submit" disabled={creating}>Add bill</Button>
@@ -365,7 +376,6 @@
 			<Select
 				label="Account"
 				bind:value={moveTargetAccountId}
-				required
 				options={accounts
 					.filter((a) => a.id !== accountId)
 					.map((target) => ({ value: String(target.id), label: target.name }))}

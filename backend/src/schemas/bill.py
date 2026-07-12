@@ -1,8 +1,12 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.bill import RecurrenceType
+
+# Matches Bill.notes' String(1000) column - keeps an over-long note a clean
+# 422 at the schema layer instead of an unhandled DB error at commit time.
+_NOTES_MAX_LENGTH = 1000
 
 
 class BillCreate(BaseModel):
@@ -13,7 +17,7 @@ class BillCreate(BaseModel):
     start_date: date
     end_date: date | None = None
     enabled: bool = True
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=_NOTES_MAX_LENGTH)
 
 
 class BillUpdate(BaseModel):
@@ -25,7 +29,7 @@ class BillUpdate(BaseModel):
     end_date: date | None = None
     enabled: bool | None = None
     account_id: int | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=_NOTES_MAX_LENGTH)
 
 
 class BillRead(BaseModel):

@@ -7,7 +7,8 @@ from datetime import date
 
 from pydantic import ValidationError
 
-from src.models.bill import RecurrenceType
+from src.forecast.bill import validate_recurrence_config
+from src.models.bill import Bill, RecurrenceType
 from src.schemas.bill import BillCreate
 
 CSV_COLUMNS = [
@@ -29,7 +30,7 @@ class RowError:
     message: str
 
 
-def bill_to_csv_row(bill) -> dict:
+def bill_to_csv_row(bill: Bill) -> dict:
     """A Bill ORM instance -> a human-readable CSV row (dollars, not cents;
     semimonthly/custom_days config flattened into their own columns instead
     of raw JSON, since spreadsheet users shouldn't need to hand-edit JSON)."""
@@ -75,25 +76,31 @@ def _field(row: dict, key: str) -> str:
     return (row.get(key) or "").strip()
 
 
-def _parse_recurrence_config(row: dict) -> dict:
-    recurrence_type = _field(row, "recurrence_type")
-    if recurrence_type == RecurrenceType.SEMIMONTHLY.value:
+def _parse_recurrence_config(row: dict, recurrence_type: RecurrenceType) -> dict:
+    # Only builds the dict from the CSV's flattened columns - validate_recurrence_config
+    # (backend/src/forecast/bill.py, the single source of truth for these shapes) is what
+    # actually checks it, so this and the JSON create/update API path can't drift apart.
+    if recurrence_type == RecurrenceType.SEMIMONTHLY:
         days_raw = _field(row, "semimonthly_days")
-        if not days_raw:
-            raise ValueError("semimonthly bills need semimonthly_days, e.g. \"10,25\"")
-        days = [int(d.strip()) for d in days_raw.split(",") if d.strip()]
-        if not days or not all(1 <= d <= 31 for d in days):
-            raise ValueError("semimonthly_days must be integers 1-31, e.g. \"10,25\"")
-        return {"days": days}
-    if recurrence_type == RecurrenceType.CUSTOM_DAYS.value:
+        try:
+            days = [int(d.strip()) for d in days_raw.split(",") if d.strip()]
+        except ValueError as exc:
+            raise ValueError('semimonthly_days must be integers, e.g. "10,25"') from exc
+        recurrence_config: dict = {"days": days}
+    elif recurrence_type == RecurrenceType.CUSTOM_DAYS:
         interval_raw = _field(row, "custom_interval_days")
-        if not interval_raw:
-            raise ValueError("custom_days bills need custom_interval_days")
-        interval = int(interval_raw)
-        if interval <= 0:
-            raise ValueError("custom_interval_days must be a positive integer")
-        return {"interval_days": interval}
-    return {}
+        try:
+            interval = int(interval_raw) if interval_raw else None
+        except ValueError as exc:
+            raise ValueError("custom_interval_days must be an integer") from exc
+        recurrence_config = {"interval_days": interval} if interval is not None else {}
+    else:
+        recurrence_config = {}
+
+    reason = validate_recurrence_config(recurrence_type, recurrence_config)
+    if reason:
+        raise ValueError(reason)
+    return recurrence_config
 
 
 def _parse_row(row: dict) -> BillCreate:
@@ -113,7 +120,7 @@ def _parse_row(row: dict) -> BillCreate:
         valid = ", ".join(t.value for t in RecurrenceType)
         raise ValueError(f"recurrence_type must be one of: {valid}") from exc
 
-    recurrence_config = _parse_recurrence_config(row)
+    recurrence_config = _parse_recurrence_config(row, recurrence_type)
 
     start_date_raw = _field(row, "start_date")
     if not start_date_raw:

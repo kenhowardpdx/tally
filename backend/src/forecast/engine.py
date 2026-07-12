@@ -118,7 +118,10 @@ def last_cycle_end(cycle_type: CycleType, start_date: date, end_date: date) -> d
     cycle could touch" (e.g. an upper bound for loading transactions/
     windfalls) should use this instead of end_date directly.
     """
-    *_, (_, last_end) = _iter_cycle_bounds(cycle_type, start_date, end_date)
+    last_end: date | None = None
+    for _, current_end in _iter_cycle_bounds(cycle_type, start_date, end_date):
+        last_end = current_end
+    assert last_end is not None  # _iter_cycle_bounds always yields at least one cycle
     return last_end
 
 

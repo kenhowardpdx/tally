@@ -82,7 +82,10 @@ erDiagram
     BANK_ACCOUNTS ||--o{ BILLS : has
     BANK_ACCOUNTS ||--o{ TRANSACTIONS : has
     BANK_ACCOUNTS ||--o{ WINDFALLS : has
+    BANK_ACCOUNTS ||--o{ CYCLE_OVERRIDES : has
     BILLS ||--o{ TRANSACTIONS : "generates (optional)"
+    BILLS ||--o{ CYCLE_OVERRIDES : "overridden in cycle"
+    WINDFALLS ||--o{ CYCLE_OVERRIDES : "overridden in cycle"
 
     USERS {
         int id PK
@@ -127,11 +130,38 @@ erDiagram
         string name
         datetime created_at
     }
+    CYCLE_OVERRIDES {
+        int id PK
+        int account_id FK
+        int bill_id FK "nullable – bill or windfall"
+        int windfall_id FK "nullable – bill or windfall"
+        date cycle_start_date
+        bool completed
+        bigint override_amount_cents "nullable"
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 Maps directly to the 8 differences: `users.auth0_sub` → auth; `bank_accounts` → multi-account;
 whole schema → Postgres; `bills.enabled` → enable/disable; `recurrence_type`/`recurrence_config`
 → finer intervals; `transactions` → one-off entries; `windfalls` → future windfalls.
+`cycle_overrides` → per-cycle reconciliation snapshots (see Phase 3, items 3.5–3.9).
+
+### Cycle overrides design note
+
+`CYCLE_OVERRIDES` is a **per-(account, bill-or-windfall, cycle_start_date)** snapshot row,
+created on demand the first time a user interacts with a bill or windfall inside an active
+cycle. Exactly one of `bill_id` / `windfall_id` is set (the other is NULL). Two independent
+concerns live in the same row:
+
+- **`completed`** — the user has confirmed the payment was made (bill) or deposit was received
+  (windfall). Replaces the old "prepend an `x` to the name" workaround from the `bank`
+  prototype; flipping this flag does not rename the bill or affect any other cycle.
+- **`override_amount_cents`** — the *actual* amount for this single occurrence (electricity
+  rebate, seasonal water bill, etc.). `NULL` means "use the bill's base amount_cents as
+  normal." Setting it replaces the forecasted amount in the running balance for this cycle
+  only; the bill's `amount_cents` is unchanged for all future cycles.
 
 `recurrence_type` is a Postgres enum (`weekly`, `biweekly`, `semimonthly`, `monthly`, `annually`,
 `custom_days`); `recurrence_config` holds the type-specific shape (e.g. `{"day_of_month": 15}`,
@@ -248,7 +278,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       in place to show bill line items, with the reference's red/gray
       negative/low-balance row coloring ported to Tailwind classes.
 
-## Phase 3 — Transactions & Windfalls
+## Phase 3 — Transactions, Windfalls & Cycle Reconciliation
 
 **Status**: not started
 
@@ -258,6 +288,33 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 - [ ] 3.3 Backend: `windfalls` CRUD (future one-time income), folded into forecast
 - [ ] 3.4 Frontend: windfall entry UI, forecast visualization highlighting windfall
       impact on the running balance
+- [ ] 3.5 Data model + migration: `cycle_overrides` table — one row per
+      (account, bill-or-windfall, cycle_start_date), with a `completed` bool and a
+      nullable `override_amount_cents`. Upsert semantics (create on first write, update
+      on subsequent writes for the same key). A DB unique constraint on
+      `(account_id, bill_id, cycle_start_date)` and `(account_id, windfall_id, cycle_start_date)`
+      (partial, one enforced per row) prevents accidental duplicates.
+- [ ] 3.6 Backend: `cycle_overrides` CRUD endpoints — `PUT /api/v1/cycle-overrides`
+      (upsert by composite key), `GET /api/v1/accounts/{id}/cycle-overrides?cycle_start={date}`
+      (all overrides for a given cycle). Scope to `get_owned_bank_account` as usual. Validate
+      that exactly one of `bill_id`/`windfall_id` is set, and that the referenced entity belongs
+      to the given account.
+- [ ] 3.7 Backend: Incorporate `cycle_overrides` into the forecast response. For any bill or
+      windfall that has an override for the cycle's `start_date`: (a) substitute
+      `override_amount_cents` for the base amount in the running balance if set; (b) annotate the
+      line item with `completed: true/false` so the frontend can render it distinctly. The
+      forecast endpoint should accept (or derive) the relevant `cycle_start_date` values and fetch
+      matching overrides in a single query rather than per-item.
+- [ ] 3.8 Frontend: Active-cycle interactive controls in the forecast view. The active cycle is
+      the cycle whose `start_date ≤ today < end_date`. In the expanded bill/windfall list for
+      that cycle only, render: a checkbox labeled "Paid" / "Received" (maps to `completed`) and
+      an optional actual-amount field (maps to `override_amount_cents`). Both persist via the 3.6
+      upsert endpoint on change. Completed items render with a strikethrough or muted style.
+      Non-active cycles remain read-only.
+- [ ] 3.9 Frontend: Reconciliation summary row at the bottom of the active cycle. Shows
+      forecasted total vs. sum-of-actuals (using override amounts where set, base amounts where
+      not), and the variance. Helps the user confirm their real bank balance matches the
+      simulated running total before the cycle closes.
 
 ## Phase 4 — Multi-account dashboard & polish
 
@@ -364,3 +421,10 @@ session (or a fresh Claude Code instance) orient in under a minute.
   or just persisted somewhere this port doesn't have yet. 1.7 (recurrence-config UI) is
   still open and still blocks semimonthly/custom_days bills from being real (they show up
   as "unscheduled" in any forecast). Next: 1.7, or Phase 3 (transactions & windfalls).
+- 2026-07-12: Roadmap updated with cycle reconciliation and snapshot overrides (items 3.5–3.9
+  in Phase 3, now renamed "Transactions, Windfalls & Cycle Reconciliation"). Added
+  `CYCLE_OVERRIDES` to the data model ER diagram and included a design note explaining the
+  two concerns it handles: `completed` (replaces the "prepend x to bill name" workaround)
+  and `override_amount_cents` (one-off amount for a single cycle occurrence, e.g. electricity
+  rebate or seasonal water bill, without touching the bill's base amount). Next: 1.7, or
+  start Phase 3.

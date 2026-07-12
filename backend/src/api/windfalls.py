@@ -44,7 +44,11 @@ async def list_windfalls(
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
 ) -> list[Windfall]:
-    result = await db.execute(select(Windfall).where(Windfall.account_id == account.id))
+    result = await db.execute(
+        select(Windfall)
+        .where(Windfall.account_id == account.id)
+        .order_by(Windfall.expected_date.asc(), Windfall.id.asc())
+    )
     return list(result.scalars().all())
 
 

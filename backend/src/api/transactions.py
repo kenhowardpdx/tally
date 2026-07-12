@@ -55,7 +55,11 @@ async def list_transactions(
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
 ) -> list[Transaction]:
-    result = await db.execute(select(Transaction).where(Transaction.account_id == account.id))
+    result = await db.execute(
+        select(Transaction)
+        .where(Transaction.account_id == account.id)
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+    )
     return list(result.scalars().all())
 
 

@@ -48,6 +48,19 @@ async def test_create_and_list_windfalls(client: AsyncClient):
     assert len(res.json()) == 1
 
 
+async def test_list_windfalls_orders_soonest_first(client: AsyncClient):
+    account = await _create_account(client)
+    for d in ("2024-06-01", "2024-04-15", "2024-05-01"):
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/windfalls",
+            json=_windfall_payload(expected_date=d),
+        )
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/windfalls")
+    dates = [w["expected_date"] for w in res.json()]
+    assert dates == ["2024-04-15", "2024-05-01", "2024-06-01"]
+
+
 async def test_update_windfall(client: AsyncClient):
     account = await _create_account(client)
     windfall = (

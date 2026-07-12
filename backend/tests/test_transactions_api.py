@@ -49,6 +49,19 @@ async def test_create_and_list_transactions(client: AsyncClient):
     assert len(res.json()) == 1
 
 
+async def test_list_transactions_orders_newest_first(client: AsyncClient):
+    account = await _create_account(client)
+    for d in ("2024-01-01", "2024-03-01", "2024-02-01"):
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/transactions",
+            json=_transaction_payload(date=d),
+        )
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/transactions")
+    dates = [t["date"] for t in res.json()]
+    assert dates == ["2024-03-01", "2024-02-01", "2024-01-01"]
+
+
 async def test_update_transaction(client: AsyncClient):
     account = await _create_account(client)
     transaction = (

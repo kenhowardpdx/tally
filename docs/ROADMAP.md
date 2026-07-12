@@ -23,6 +23,9 @@ A multi-user bill-tracking and forecasting app, evolved from
 6. Finer-grained due-date interval control than "day of month" or "annual"
 7. Ability to add one-off transactions within the current cycle
 8. Ability to forecast a future windfall (bonus, tax refund, etc.)
+9. Human-readable CSV import/export of all bills for a bank account, editable in Excel
+   or Numbers, with amounts formatted in the selected display currency (default
+   USD)
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -53,7 +56,9 @@ porting rather than re-deriving from scratch:
   real time.
 - **Money**: integer cents (`amount_cents`, `BigInteger`) in Postgres, `Decimal` in
   Python — never float. The reference app's `Amount` class uses `parseFloat` on
-  currency strings, a real precision bug worth not repeating.
+  currency strings, a real precision bug worth not repeating. For UI and CSV
+  import/export, format and parse amounts using the selected display currency
+  (default USD) while persisting normalized cents.
 - **Recurrence model**: an extended enum (`weekly`, `biweekly`, `semimonthly`,
   `monthly`, `annually`, `custom_days`) plus a small JSONB `recurrence_config` column
   for the type-specific bits (weekday, day-of-month, interval-in-days, etc.). Covers
@@ -168,7 +173,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: code complete; one follow-up item below (1.7, not yet scoped)
+**Status**: code complete; follow-up items below (1.7-1.8)
 
 - [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
 - [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
@@ -197,6 +202,13 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       (annually). Needs per-type conditional form fields on both create and edit. Blocks
       exercising Phase 2's forecast engine end-to-end against real user-created bills of
       non-trivial recurrence types.
+- [ ] 1.8 Bills CSV import/export per bank account. Backend: add account-scoped export and
+      import endpoints for the full bills list, with validation/error reporting granular
+      enough for a user-edited CSV. Frontend: add import/export actions on the bills page
+      for the current account, with a downloadable template/example. CSV should stay
+      human-readable and spreadsheet-friendly (Excel/Numbers), especially for money:
+      amounts should be rendered and accepted in the selected display currency (default
+      USD), while the backend continues storing normalized cents.
 
 ## Phase 2 — Forecast Engine
 
@@ -315,3 +327,7 @@ session (or a fresh Claude Code instance) orient in under a minute.
   popover calendar, no new dependency) components; "Recurrence" renamed to "Frequency" with
   human-readable value labels everywhere. Left 1.7 alone (recurrence-config UI) per its own
   "not yet designed" flag. Next: scope 1.7, or start Phase 2.
+- 2026-07-12: Roadmap expanded with a new bills CSV import/export follow-up (1.8): per
+  account, human-readable spreadsheet-friendly CSVs, with amounts formatted and parsed in the
+  selected display currency (default USD), while storage remains normalized cents. Next: decide when
+  to slot 1.8 relative to 1.7 vs. Phase 2.

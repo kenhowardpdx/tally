@@ -2,13 +2,14 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
-from src.api import accounts, bills
+from src.api import accounts, bills, forecast
 from src.core.auth import get_current_user
 
 app = FastAPI()
 
 app.include_router(accounts.router)
 app.include_router(bills.router)
+app.include_router(forecast.router)
 
 # Only needed for local dev: the frontend (:5173) and backend (:8000) run on
 # different origins there. In prod they share an origin via CloudFront's

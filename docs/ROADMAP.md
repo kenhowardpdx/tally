@@ -303,9 +303,9 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 - [ ] 3.5 Data model + migration: `cycle_overrides` table — one row per
       (account, bill-or-windfall, cycle_start_date), with a `completed` bool and a
       nullable `override_amount_cents`, plus optional `notes` text. Upsert semantics (create on first write, update
-      on subsequent writes for the same key). A DB unique constraint on
+      on subsequent writes for the same key). DB uniqueness via constraints/indexes on
       `(account_id, bill_id, cycle_start_date)` and `(account_id, windfall_id, cycle_start_date)`
-      (partial, one enforced per row) prevents accidental duplicates.
+      prevents accidental duplicates.
 - [ ] 3.6 Backend: `cycle_overrides` CRUD endpoints — `PUT /api/v1/cycle-overrides`
       (upsert by composite key), `GET /api/v1/accounts/{id}/cycle-overrides?cycle_start={date}`
       (all overrides for a given cycle). Scope to `get_owned_bank_account` as usual. Validate

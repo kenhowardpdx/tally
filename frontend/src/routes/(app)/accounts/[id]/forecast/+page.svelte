@@ -93,13 +93,6 @@
 		expanded = { ...expanded, [cycleStart]: !expanded[cycleStart] };
 	}
 
-	function handleRowKeydown(event: KeyboardEvent, cycleStart: string) {
-		if (event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			toggleExpanded(cycleStart);
-		}
-	}
-
 	function formatAmount(cents: number): string {
 		return (cents / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 	}
@@ -123,8 +116,20 @@
 
 <Card>
 	<form class="flex flex-wrap items-end gap-4" onsubmit={handleCalculate}>
-		<Input label="Starting balance ($)" type="number" bind:value={startingBalance} required />
-		<Input label="Income per cycle ($)" type="number" bind:value={incomePerCycle} required />
+		<Input
+			label="Starting balance ($)"
+			type="number"
+			step="0.01"
+			bind:value={startingBalance}
+			required
+		/>
+		<Input
+			label="Income per cycle ($)"
+			type="number"
+			step="0.01"
+			bind:value={incomePerCycle}
+			required
+		/>
 		<DatePicker label="Start date" bind:value={startDate} />
 		<DatePicker label="End date" bind:value={endDate} />
 		<Select label="Cycle" bind:value={cycleType}>
@@ -157,17 +162,23 @@
 			<tbody>
 				{#each forecast.cycles as cycle (cycle.start_date)}
 					{@const clickable = cycle.bills.length > 0}
-					<tr
-						class="border-b border-slate-100 last:border-0 {clickable
-							? 'cursor-pointer'
-							: ''} {rowClass(cycle.running_balance_cents)}"
-						role={clickable ? 'button' : undefined}
-						tabindex={clickable ? 0 : undefined}
-						onclick={() => clickable && toggleExpanded(cycle.start_date)}
-						onkeydown={(event) => clickable && handleRowKeydown(event, cycle.start_date)}
-					>
-						<td class="px-4 py-2" colspan="2">{cycle.start_date} - {cycle.end_date}</td>
-						<td class="px-4 py-2 text-right">{formatAmount(cycle.running_balance_cents)}</td>
+					<tr class="border-b border-slate-100 last:border-0 {rowClass(cycle.running_balance_cents)}">
+						{#if clickable}
+							<td class="p-0" colspan="3">
+								<button
+									type="button"
+									class="flex w-full cursor-pointer items-center justify-between px-4 py-2 text-left"
+									onclick={() => toggleExpanded(cycle.start_date)}
+									aria-expanded={!!expanded[cycle.start_date]}
+								>
+									<span>{cycle.start_date} - {cycle.end_date}</span>
+									<span>{formatAmount(cycle.running_balance_cents)}</span>
+								</button>
+							</td>
+						{:else}
+							<td class="px-4 py-2" colspan="2">{cycle.start_date} - {cycle.end_date}</td>
+							<td class="px-4 py-2 text-right">{formatAmount(cycle.running_balance_cents)}</td>
+						{/if}
 					</tr>
 					{#if expanded[cycle.start_date]}
 						{#each cycle.bills as bill (bill.bill_id + bill.due_date)}

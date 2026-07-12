@@ -207,8 +207,6 @@ class TestRecurrenceConfigValidation:
         assert validate_recurrence_config(bill) is not None
         with pytest.raises(MissingRecurrenceConfig):
             occurrences_in_range(bill, date(2024, 3, 1), date(2024, 3, 31))
-        with pytest.raises(MissingRecurrenceConfig):
-            occurrences_in_range(bill, date(2024, 3, 1), date(2024, 3, 31))
 
     def test_custom_days_with_config(self):
         bill = make_bill(

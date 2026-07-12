@@ -61,6 +61,10 @@ jobs:
           # Empty: prod frontend and API share an origin via CloudFront's /api/v1/* routing
           # (see infra/main.tf's cloudfront module), so API calls are relative.
           PUBLIC_API_BASE_URL: ""
+          # Hardcoded literal, never a secret - must always be false in a
+          # deployed build. $env/static/public still requires the key to
+          # exist at build time even though the value is fixed here.
+          PUBLIC_DEV_AUTH_BYPASS: "false"
         run: yarn build
 
       - name: Verify Build Output

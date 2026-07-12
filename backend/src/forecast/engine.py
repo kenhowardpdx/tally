@@ -45,22 +45,21 @@ def _add_months(d: date, months: int) -> date:
     return date(year, month, day)
 
 
-def _normalize_semimonthly_start(start: date) -> date:
-    """Snaps an arbitrary date to the actual boundary of the 10th/25th pay
-    period it falls in: days 1-9 belong to the cycle that started the 25th of
-    the *previous* month, 10-24 to the one starting the 10th, 25-31 to the one
-    starting the 25th."""
-    if start.day <= 9:
-        prev_month = _add_months(date(start.year, start.month, 1), -1)
-        return date(prev_month.year, prev_month.month, 25)
-    if start.day <= 24:
-        return date(start.year, start.month, 10)
-    return date(start.year, start.month, 25)
-
-
 def _cycle_bounds(cycle_type: CycleType, start: date) -> tuple[date, date]:
-    """Given a cycle's (already-normalized) start date, returns
-    (this cycle's end date, next cycle's start date)."""
+    """Given a cycle's start date, returns (this cycle's end date, next
+    cycle's start date).
+
+    For SEMIMONTHLY this deliberately does NOT snap `start` backward onto the
+    nearest 10th/25th boundary first - only the END of whatever half-month
+    period `start` currently falls in, and the START of the next one. Doing
+    otherwise would silently include bills from before the caller's actual
+    start_date in the first cycle, corrupting the meaning of
+    starting_balance_cents (it's meant to be the balance as of start_date,
+    not as of some earlier snapped date). The first cycle can end up shorter
+    than a full half-month as a result (e.g. start_date the 21st produces a
+    21st-24th first cycle) - every cycle after that is a full period, since
+    `next_start` here is always exactly the 10th or 25th.
+    """
     if cycle_type == CycleType.WEEKLY:
         return start + timedelta(days=6), start + timedelta(days=7)
     if cycle_type == CycleType.BIWEEKLY:
@@ -69,10 +68,13 @@ def _cycle_bounds(cycle_type: CycleType, start: date) -> tuple[date, date]:
         next_start = _add_months(start, 1)
         return next_start - timedelta(days=1), next_start
     if cycle_type == CycleType.SEMIMONTHLY:
-        if start.day == 10:
+        if start.day <= 9:
+            end = date(start.year, start.month, 9)
+            next_start = date(start.year, start.month, 10)
+        elif start.day <= 24:
             end = date(start.year, start.month, 24)
             next_start = date(start.year, start.month, 25)
-        else:  # start.day == 25, guaranteed by normalization/stepping
+        else:  # start.day >= 25
             next_month = _add_months(date(start.year, start.month, 1), 1)
             end = date(next_month.year, next_month.month, 9)
             next_start = date(next_month.year, next_month.month, 10)
@@ -100,12 +102,7 @@ def get_forecast(
         else:
             schedulable.append(bill)
 
-    current_start = (
-        _normalize_semimonthly_start(start_date)
-        if cycle_type == CycleType.SEMIMONTHLY
-        else start_date
-    )
-
+    current_start = start_date
     running_balance = starting_balance_cents
     cycles: list[ForecastCycle] = []
 

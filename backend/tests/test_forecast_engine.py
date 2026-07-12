@@ -14,7 +14,13 @@ reference's day-bucket boundary for snapping an arbitrary start date onto the
 10th/25th anchor is itself buggy (day 21 snaps to the 25th, skipping the
 still-in-progress 10th-24th period entirely) and is exactly the
 `start`/`next` object-aliasing code this port intentionally rewrites rather
-than reproduces - see _normalize_semimonthly_start in engine.py. The
+than reproduces. This port goes further than just fixing the bucket
+boundary, though: it doesn't snap the *first* cycle's start backward onto a
+10th/25th anchor at all (see _cycle_bounds in engine.py) - doing so would
+silently include bills from before the caller's actual start_date in the
+first cycle, corrupting the meaning of starting_balance_cents (a real bug
+caught in PR review). The first semimonthly cycle can end up shorter than a
+full half-month as a result; every cycle after that is a full period. The
 semimonthly cases below pin this engine's own (verified self-consistent)
 output instead.
 """
@@ -125,7 +131,21 @@ class TestGetForecastSemimonthly:
         ]
         result = get_forecast(bills, CycleType.SEMIMONTHLY, date(1985, 10, 21), date(1985, 11, 28), 2498, 15999)
         assert len(result.cycles) == 4
-        assert result.ending_balance_cents == -497476
+        assert result.ending_balance_cents == -215491
+
+    def test_first_cycle_honors_exact_start_date_not_the_10th_25th_anchor(self):
+        # A mid-period start_date (the 21st) must not be snapped backward to
+        # the 10th - that would silently pull bills due the 10th-20th into
+        # the first cycle even though starting_balance_cents is supposed to
+        # represent the balance as of the 21st, not the 10th.
+        bill = make_bill(1, "already happened", 5000, date(2024, 1, 15))
+        result = get_forecast(
+            [bill], CycleType.SEMIMONTHLY, date(2024, 1, 21), date(2024, 1, 21), 0, 0
+        )
+        assert result.cycles[0].start_date == date(2024, 1, 21)
+        assert result.cycles[0].end_date == date(2024, 1, 24)
+        assert result.cycles[0].bills == []
+        assert result.ending_balance_cents == 0
 
 
 class TestGetForecastWeekly:

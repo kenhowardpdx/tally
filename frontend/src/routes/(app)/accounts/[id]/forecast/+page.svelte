@@ -187,7 +187,7 @@
 						{/if}
 					</tr>
 					{#if expanded[cycle.start_date]}
-						{#each cycle.bills as bill (bill.bill_id + bill.due_date)}
+						{#each cycle.bills as bill (`${bill.bill_id}-${bill.due_date}`)}
 							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
 								<td class="px-4 py-2 pl-8">{bill.due_date}</td>
 								<td class="px-4 py-2">{bill.name}</td>

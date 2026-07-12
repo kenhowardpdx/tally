@@ -27,6 +27,7 @@ A multi-user bill-tracking and forecasting app, evolved from
    or Numbers, with amounts formatted in the selected display currency (default
    USD)
 10. Notes support on bills and per-cycle override snapshots (for reconciliation context)
+11. A bill history view showing forecasted vs actual outcomes across prior cycles
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -326,6 +327,13 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       forecasted total vs. sum-of-actuals (using override amounts where set, base amounts where
       not), and the variance. Helps the user confirm their real bank balance matches the
       simulated running total before the cycle closes.
+- [ ] 3.10 Backend: bill-history endpoint/query for a single bill, returning cycle-by-cycle
+      entries (cycle window, expected amount, actual overridden amount if present, completion
+      status, override notes, and variance). Include pagination/date-range filters so large
+      histories remain performant.
+- [ ] 3.11 Frontend: bill history view accessible from the bills page and/or forecast line
+      items. Render a chronological table/timeline showing each cycle’s expected vs actual
+      amount, paid state, notes, and variance so users can spot drift patterns over time.
 
 ## Phase 4 — Multi-account dashboard & polish
 
@@ -444,3 +452,7 @@ session (or a fresh Claude Code instance) orient in under a minute.
   updated follow-up scope with 1.9 (bill notes API/UI) plus notes handling in 3.5/3.7/3.8 so
   active-cycle reconciliation can capture explanatory context per occurrence. Next: 1.7, 1.9,
   or start Phase 3.
+- 2026-07-12: Roadmap expanded again with a dedicated bill history view feature. Added Vision
+  item 11 and new Phase 3 items 3.10/3.11 for backend bill-history data and a frontend
+  timeline/table so users can review expected vs actual outcomes, completion, notes, and
+  variance over prior cycles.

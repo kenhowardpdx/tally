@@ -206,9 +206,9 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       import endpoints for the full bills list, with validation/error reporting granular
       enough for a user-edited CSV. Frontend: add import/export actions on the bills page
       for the current account, with a downloadable template/example. CSV should stay
-      human-readable and spreadsheet-friendly (Excel/Numbers), especially for money:
-      amounts should be rendered and accepted in the account's selected currency, default
-      USD, while the backend continues storing normalized cents.
+human-readable and spreadsheet-friendly (Excel/Numbers), especially for money:
+amounts should be rendered and accepted in the selected display currency (default
+USD), while the backend continues storing normalized cents.
 
 ## Phase 2 — Forecast Engine
 

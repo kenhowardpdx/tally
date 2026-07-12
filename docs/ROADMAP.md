@@ -26,6 +26,7 @@ A multi-user bill-tracking and forecasting app, evolved from
 9. Human-readable CSV import/export of all bills for a bank account, editable in Excel
    or Numbers, with amounts formatted in the selected display currency (default
    USD)
+10. Notes support on bills and per-cycle override snapshots (for reconciliation context)
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -110,6 +111,7 @@ erDiagram
         date start_date
         date end_date
         bool enabled
+        string notes "nullable"
         datetime created_at
         datetime updated_at
     }
@@ -138,6 +140,7 @@ erDiagram
         date cycle_start_date
         bool completed
         bigint override_amount_cents "nullable"
+        string notes "nullable"
         datetime created_at
         datetime updated_at
     }
@@ -147,12 +150,14 @@ Maps directly to the 8 differences: `users.auth0_sub` → auth; `bank_accounts` 
 whole schema → Postgres; `bills.enabled` → enable/disable; `recurrence_type`/`recurrence_config`
 → finer intervals; `transactions` → one-off entries; `windfalls` → future windfalls.
 `cycle_overrides` → per-cycle reconciliation snapshots (see Phase 3, items 3.5–3.9).
+`bills.notes`/`cycle_overrides.notes` → optional user-entered context for recurring entries and
+cycle-specific adjustments.
 
 ### Cycle overrides design note
 
 `CYCLE_OVERRIDES` is a **per-(account, bill-or-windfall, cycle_start_date)** snapshot row,
 created on demand the first time a user interacts with a bill or windfall inside an active
-cycle. Exactly one of `bill_id` / `windfall_id` is set (the other is NULL). Two independent
+cycle. Exactly one of `bill_id` / `windfall_id` is set (the other is NULL). Three independent
 concerns live in the same row:
 
 - **`completed`** — the user has confirmed the payment was made (bill) or deposit was received
@@ -162,6 +167,8 @@ concerns live in the same row:
   rebate, seasonal water bill, etc.). `NULL` means "use the bill's base amount_cents as
   normal." Setting it replaces the forecasted amount in the running balance for this cycle
   only; the bill's `amount_cents` is unchanged for all future cycles.
+- **`notes`** — optional cycle-specific context (why an amount changed, confirmation details,
+  reimbursement timing, etc.) without editing the canonical bill or windfall definitions.
 
 `recurrence_type` is a Postgres enum (`weekly`, `biweekly`, `semimonthly`, `monthly`, `annually`,
 `custom_days`); `recurrence_config` holds the type-specific shape (e.g. `{"day_of_month": 15}`,
@@ -203,7 +210,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 1 — Accounts & Bills CRUD
 
-**Status**: code complete; follow-up items below (1.7-1.8)
+**Status**: code complete; follow-up items below (1.7-1.9)
 
 - [x] 1.1 Backend: `bank_accounts` CRUD API, scoped to the authenticated user
 - [x] 1.2 Backend: `bills` CRUD API, scoped to an account, including the enable/disable
@@ -239,6 +246,10 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       human-readable and spreadsheet-friendly (Excel/Numbers), especially for money:
       amounts should be rendered and accepted in the selected display currency (default
       USD), while the backend continues storing normalized cents.
+- [ ] 1.9 Bill notes support. Backend: extend `bills` schema + create/update/read endpoints with
+      optional `notes` text (`NULL`/empty allowed). Frontend: add notes field to bill create/edit
+      form and display in the bills table/detail affordance. Notes are persistent bill metadata
+      and apply to all future cycles for that bill.
 
 ## Phase 2 — Forecast Engine
 
@@ -290,7 +301,7 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       impact on the running balance
 - [ ] 3.5 Data model + migration: `cycle_overrides` table — one row per
       (account, bill-or-windfall, cycle_start_date), with a `completed` bool and a
-      nullable `override_amount_cents`. Upsert semantics (create on first write, update
+      nullable `override_amount_cents`, plus optional `notes` text. Upsert semantics (create on first write, update
       on subsequent writes for the same key). A DB unique constraint on
       `(account_id, bill_id, cycle_start_date)` and `(account_id, windfall_id, cycle_start_date)`
       (partial, one enforced per row) prevents accidental duplicates.
@@ -302,15 +313,15 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 - [ ] 3.7 Backend: Incorporate `cycle_overrides` into the forecast response. For any bill or
       windfall that has an override for the cycle's `start_date`: (a) substitute
       `override_amount_cents` for the base amount in the running balance if set; (b) annotate the
-      line item with `completed: true/false` so the frontend can render it distinctly. The
-      forecast endpoint should accept (or derive) the relevant `cycle_start_date` values and fetch
-      matching overrides in a single query rather than per-item.
+      line item with `completed: true/false`; (c) return `notes` so the frontend can render cycle
+      context inline. The forecast endpoint should accept (or derive) the relevant
+      `cycle_start_date` values and fetch matching overrides in a single query rather than per-item.
 - [ ] 3.8 Frontend: Active-cycle interactive controls in the forecast view. The active cycle is
       the cycle whose `start_date ≤ today < end_date`. In the expanded bill/windfall list for
       that cycle only, render: a checkbox labeled "Paid" / "Received" (maps to `completed`) and
-      an optional actual-amount field (maps to `override_amount_cents`). Both persist via the 3.6
-      upsert endpoint on change. Completed items render with a strikethrough or muted style.
-      Non-active cycles remain read-only.
+      an optional actual-amount field (maps to `override_amount_cents`), and an optional note field
+      (maps to `notes`). All persist via the 3.6 upsert endpoint on change. Completed items render
+      with a strikethrough or muted style. Non-active cycles remain read-only.
 - [ ] 3.9 Frontend: Reconciliation summary row at the bottom of the active cycle. Shows
       forecasted total vs. sum-of-actuals (using override amounts where set, base amounts where
       not), and the variance. Helps the user confirm their real bank balance matches the
@@ -428,3 +439,8 @@ session (or a fresh Claude Code instance) orient in under a minute.
   and `override_amount_cents` (one-off amount for a single cycle occurrence, e.g. electricity
   rebate or seasonal water bill, without touching the bill's base amount). Next: 1.7, or
   start Phase 3.
+- 2026-07-12: Roadmap expanded to include notes support for both recurring bills and cycle
+  overrides. Added `bills.notes` and `cycle_overrides.notes` to the data model sketch and
+  updated follow-up scope with 1.9 (bill notes API/UI) plus notes handling in 3.5/3.7/3.8 so
+  active-cycle reconciliation can capture explanatory context per occurrence. Next: 1.7, 1.9,
+  or start Phase 3.

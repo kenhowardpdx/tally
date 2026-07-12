@@ -24,7 +24,7 @@ A multi-user bill-tracking and forecasting app, evolved from
 7. Ability to add one-off transactions within the current cycle
 8. Ability to forecast a future windfall (bonus, tax refund, etc.)
 9. Human-readable CSV import/export of all bills for a bank account, editable in Excel
-   or Numbers, with amounts formatted in the account/user-selected currency (default
+   or Numbers, with amounts formatted in the selected display currency (default
    USD)
 
 ## What to reuse from `kenhowardpdx/bank`

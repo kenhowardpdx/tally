@@ -165,9 +165,10 @@ concerns live in the same row:
   (windfall). Replaces the old "prepend an `x` to the name" workaround from the `bank`
   prototype; flipping this flag does not rename the bill or affect any other cycle.
 - **`override_amount_cents`** — the *actual* amount for this single occurrence (electricity
-  rebate, seasonal water bill, etc.). `NULL` means "use the bill's base amount_cents as
-  normal." Setting it replaces the forecasted amount in the running balance for this cycle
-  only; the bill's `amount_cents` is unchanged for all future cycles.
+  rebate, seasonal water bill, etc.). `NULL` means "use the bill's or windfall's base
+  `amount_cents` as normal." Setting it replaces the forecasted amount in the running balance
+  for this cycle only; the underlying bill's or windfall's `amount_cents` is unchanged for
+  all future cycles.
 - **`notes`** — optional cycle-specific context (why an amount changed, confirmation details,
   reimbursement timing, etc.) without editing the canonical bill or windfall definitions.
 
@@ -443,10 +444,11 @@ session (or a fresh Claude Code instance) orient in under a minute.
 - 2026-07-12: Roadmap updated with cycle reconciliation and snapshot overrides (items 3.5–3.9
   in Phase 3, now renamed "Transactions, Windfalls & Cycle Reconciliation"). Added
   `CYCLE_OVERRIDES` to the data model ER diagram and included a design note explaining the
-  two concerns it handles: `completed` (replaces the "prepend x to bill name" workaround)
-  and `override_amount_cents` (one-off amount for a single cycle occurrence, e.g. electricity
-  rebate or seasonal water bill, without touching the bill's base amount). Next: 1.7, or
-  start Phase 3.
+  three concerns it handles: `completed` (replaces the "prepend x to bill name" workaround),
+  `override_amount_cents` (one-off amount for a single cycle occurrence, e.g. electricity
+  rebate or seasonal water bill, without touching the underlying bill's or windfall's base
+  amount), and `notes` (cycle-specific context without editing the canonical bill or windfall
+  definitions). Next: 1.7, or start Phase 3.
 - 2026-07-12: Roadmap expanded to include notes support for both recurring bills and cycle
   overrides. Added `bills.notes` and `cycle_overrides.notes` to the data model sketch and
   updated follow-up scope with 1.9 (bill notes API/UI) plus notes handling in 3.5/3.7/3.8 so

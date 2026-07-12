@@ -65,6 +65,35 @@ async def test_update_transaction(client: AsyncClient):
     assert res.json()["amount_cents"] == 500
 
 
+async def test_update_transaction_rejects_explicit_null_on_required_field(client: AsyncClient):
+    account = await _create_account(client)
+    transaction = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload()
+        )
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/transactions/{transaction['id']}",
+        json={"amount_cents": None},
+    )
+    assert res.status_code == 422
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/transactions/{transaction['id']}",
+        json={"date": None},
+    )
+    assert res.status_code == 422
+
+    # Nullable fields (description, bill_id) may still be explicitly cleared.
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/transactions/{transaction['id']}",
+        json={"description": None},
+    )
+    assert res.status_code == 200
+    assert res.json()["description"] is None
+
+
 async def test_delete_transaction(client: AsyncClient):
     account = await _create_account(client)
     transaction = (

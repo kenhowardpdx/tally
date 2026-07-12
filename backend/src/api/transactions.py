@@ -26,6 +26,22 @@ async def _get_owned_transaction(
     return transaction
 
 
+_NON_NULLABLE_UPDATE_FIELDS = ("amount_cents", "date")
+
+
+def _reject_explicit_nulls(update_data: dict) -> None:
+    nulled = [
+        field
+        for field in _NON_NULLABLE_UPDATE_FIELDS
+        if field in update_data and update_data[field] is None
+    ]
+    if nulled:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Field(s) cannot be null: {', '.join(nulled)}",
+        )
+
+
 async def _validate_bill_id(bill_id: int | None, account_id: int, db: AsyncSession) -> None:
     if bill_id is None:
         return
@@ -65,6 +81,7 @@ async def update_transaction(
     transaction: Transaction = Depends(_get_owned_transaction),
 ) -> Transaction:
     update_data = payload.model_dump(exclude_unset=True)
+    _reject_explicit_nulls(update_data)
     if "bill_id" in update_data:
         await _validate_bill_id(update_data["bill_id"], account.id, db)
     for field, value in update_data.items():

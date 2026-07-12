@@ -9,6 +9,21 @@ from src.schemas.windfall import WindfallCreate, WindfallRead, WindfallUpdate
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/windfalls", tags=["windfalls"])
 
+_NON_NULLABLE_UPDATE_FIELDS = ("name", "amount_cents", "expected_date")
+
+
+def _reject_explicit_nulls(update_data: dict) -> None:
+    nulled = [
+        field
+        for field in _NON_NULLABLE_UPDATE_FIELDS
+        if field in update_data and update_data[field] is None
+    ]
+    if nulled:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Field(s) cannot be null: {', '.join(nulled)}",
+        )
+
 
 async def _get_owned_windfall(
     windfall_id: int,
@@ -52,7 +67,9 @@ async def update_windfall(
     db: AsyncSession = Depends(get_db),
     windfall: Windfall = Depends(_get_owned_windfall),
 ) -> Windfall:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+    _reject_explicit_nulls(update_data)
+    for field, value in update_data.items():
         setattr(windfall, field, value)
     await db.commit()
     await db.refresh(windfall)

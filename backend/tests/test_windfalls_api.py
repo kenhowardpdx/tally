@@ -64,6 +64,22 @@ async def test_update_windfall(client: AsyncClient):
     assert res.json()["amount_cents"] == 75000
 
 
+async def test_update_windfall_rejects_explicit_null_on_required_field(client: AsyncClient):
+    account = await _create_account(client)
+    windfall = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/windfalls", json=_windfall_payload()
+        )
+    ).json()
+
+    for field in ("name", "amount_cents", "expected_date"):
+        res = await client.patch(
+            f"/api/v1/accounts/{account['id']}/windfalls/{windfall['id']}",
+            json={field: None},
+        )
+        assert res.status_code == 422
+
+
 async def test_delete_windfall(client: AsyncClient):
     account = await _create_account(client)
     windfall = (

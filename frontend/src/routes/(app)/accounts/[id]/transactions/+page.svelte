@@ -44,7 +44,7 @@
 		event.preventDefault();
 		const amountCents = Math.round(Number(amount) * 100);
 		if (!date || Number.isNaN(amountCents)) {
-			error = 'Please choose a date.';
+			error = !date ? 'Please choose a date.' : 'Please enter a valid amount.';
 			return;
 		}
 		creating = true;

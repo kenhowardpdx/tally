@@ -41,11 +41,17 @@ async def compute_forecast(
         for bill in bills_result.scalars().all()
     ]
 
+    # Only bound the query by start_date, not end_date: no cycle ever starts
+    # before start_date, so anything dated earlier can never appear - but the
+    # final cycle's actual end (computed by get_forecast/_cycle_bounds) can
+    # extend past end_date depending on cycle_type, and bills aren't bounded
+    # by end_date either (occurrences_in_range uses the real cycle end). An
+    # upper bound here would silently drop transactions/windfalls that a bill
+    # due on the same date would still show, corrupting that cycle's net_cents.
     transactions_result = await db.execute(
         select(Transaction).where(
             Transaction.account_id == account.id,
             Transaction.date >= payload.start_date,
-            Transaction.date <= payload.end_date,
         )
     )
     forecast_transactions = [
@@ -62,7 +68,6 @@ async def compute_forecast(
         select(Windfall).where(
             Windfall.account_id == account.id,
             Windfall.expected_date >= payload.start_date,
-            Windfall.expected_date <= payload.end_date,
         )
     )
     forecast_windfalls = [

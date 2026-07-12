@@ -56,6 +56,19 @@ jobs:
         with:
           node-version-file: ./frontend/.nvmrc
       - name: Test
+        env:
+          # Dummy but present: svelte-kit sync generates $env/static/public's
+          # ambient types from whatever env vars actually exist at sync time,
+          # so svelte-check fails on any var the code imports but this step
+          # doesn't set - exactly the gap that let PR #91 merge without
+          # PUBLIC_DEV_AUTH_BYPASS wired into deploy-frontend.yml, breaking
+          # every deploy until fixed here too. Values don't matter, presence does.
+          PUBLIC_AUTH0_DOMAIN: test.auth0.com
+          PUBLIC_AUTH0_CLIENT_ID: test-client-id
+          PUBLIC_AUTH0_AUDIENCE: https://api.test.example.com
+          PUBLIC_API_BASE_URL: http://localhost:8000
+          PUBLIC_DEV_AUTH_BYPASS: "false"
         run: |
           yarn install --frozen-lockfile
+          yarn run check
           yarn test

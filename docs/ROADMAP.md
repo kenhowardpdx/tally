@@ -328,6 +328,6 @@ session (or a fresh Claude Code instance) orient in under a minute.
   human-readable value labels everywhere. Left 1.7 alone (recurrence-config UI) per its own
   "not yet designed" flag. Next: scope 1.7, or start Phase 2.
 - 2026-07-12: Roadmap expanded with a new bills CSV import/export follow-up (1.8): per
-account, human-readable spreadsheet-friendly CSVs, with amounts formatted and parsed in the
-selected display currency (default USD), while storage remains normalized cents. Next: decide when
+  account, human-readable spreadsheet-friendly CSVs, with amounts formatted and parsed in the
+  selected display currency (default USD), while storage remains normalized cents. Next: decide when
   to slot 1.8 relative to 1.7 vs. Phase 2.

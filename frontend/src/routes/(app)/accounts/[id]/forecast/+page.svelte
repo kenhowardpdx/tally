@@ -202,7 +202,7 @@
 								<td class="px-4 py-2">{transaction.description ?? 'Transaction'}</td>
 								<td
 									class="px-4 py-2 text-right {transaction.amount_cents < 0
-										? ''
+										? 'text-red-700'
 										: 'text-emerald-700'}"
 								>
 									{formatAmount(transaction.amount_cents)}

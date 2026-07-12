@@ -21,6 +21,7 @@
 		{#each links as link (link.key)}
 			<a
 				href={link.href}
+				aria-current={link.key === current ? 'page' : undefined}
 				class="text-sm {link.key === current
 					? 'font-semibold text-primary'
 					: 'text-slate-600 hover:text-primary'}"

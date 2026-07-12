@@ -43,7 +43,10 @@
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
 		const amountCents = Math.round(Number(amount) * 100);
-		if (!date || Number.isNaN(amountCents)) return;
+		if (!date || Number.isNaN(amountCents)) {
+			error = 'Please choose a date.';
+			return;
+		}
 		creating = true;
 		try {
 			await createTransaction(accountId, {

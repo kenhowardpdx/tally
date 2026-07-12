@@ -52,6 +52,40 @@ export interface BillInput {
 	enabled?: boolean;
 }
 
+export interface Transaction {
+	id: number;
+	account_id: number;
+	bill_id: number | null;
+	// Signed: positive credits the balance, negative debits it.
+	amount_cents: number;
+	date: string;
+	description: string | null;
+	created_at: string;
+}
+
+export interface TransactionInput {
+	amount_cents: number;
+	date: string;
+	description?: string | null;
+	bill_id?: number | null;
+}
+
+export interface Windfall {
+	id: number;
+	account_id: number;
+	name: string;
+	// Always positive - a windfall is income by definition.
+	amount_cents: number;
+	expected_date: string;
+	created_at: string;
+}
+
+export interface WindfallInput {
+	name: string;
+	amount_cents: number;
+	expected_date: string;
+}
+
 export interface ForecastRequest {
 	start_date: string;
 	end_date: string;
@@ -67,11 +101,27 @@ export interface ForecastBillLine {
 	due_date: string;
 }
 
+export interface ForecastTransactionLine {
+	transaction_id: number;
+	amount_cents: number;
+	date: string;
+	description: string | null;
+}
+
+export interface ForecastWindfallLine {
+	windfall_id: number;
+	name: string;
+	amount_cents: number;
+	expected_date: string;
+}
+
 export interface ForecastCycle {
 	start_date: string;
 	end_date: string;
 	bills: ForecastBillLine[];
-	cycle_sum_cents: number;
+	transactions: ForecastTransactionLine[];
+	windfalls: ForecastWindfallLine[];
+	net_cents: number;
 	running_balance_cents: number;
 }
 

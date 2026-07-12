@@ -28,11 +28,27 @@ class ForecastBillLine(BaseModel):
     due_date: date
 
 
+class ForecastTransactionLine(BaseModel):
+    transaction_id: int
+    amount_cents: int
+    date: date
+    description: str | None
+
+
+class ForecastWindfallLine(BaseModel):
+    windfall_id: int
+    name: str
+    amount_cents: int
+    expected_date: date
+
+
 class ForecastCycle(BaseModel):
     start_date: date
     end_date: date
     bills: list[ForecastBillLine]
-    cycle_sum_cents: int
+    transactions: list[ForecastTransactionLine]
+    windfalls: list[ForecastWindfallLine]
+    net_cents: int
     running_balance_cents: int
 
 

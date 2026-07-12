@@ -4,13 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_owned_bank_account
 from src.core.database import get_db
-from src.forecast import ForecastBill, get_forecast
-from src.models import BankAccount, Bill
+from src.forecast import (
+    ForecastBill,
+    ForecastTransaction,
+    ForecastWindfall,
+    get_forecast,
+    last_cycle_end,
+)
+from src.models import BankAccount, Bill, Transaction, Windfall
 from src.schemas.forecast import (
     ForecastBillLine,
     ForecastCycle,
     ForecastRequest,
     ForecastResponse,
+    ForecastTransactionLine,
+    ForecastWindfallLine,
     UnscheduledBill,
 )
 
@@ -23,7 +31,7 @@ async def compute_forecast(
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
 ) -> ForecastResponse:
-    result = await db.execute(
+    bills_result = await db.execute(
         select(Bill).where(Bill.account_id == account.id, Bill.enabled.is_(True))
     )
     forecast_bills = [
@@ -36,7 +44,50 @@ async def compute_forecast(
             start_date=bill.start_date,
             end_date=bill.end_date,
         )
-        for bill in result.scalars().all()
+        for bill in bills_result.scalars().all()
+    ]
+
+    # Bound the query to [start_date, last cycle's actual end]: no cycle ever
+    # starts before start_date, and the final cycle can run past end_date
+    # depending on cycle_type (see _cycle_bounds) - using end_date directly
+    # as the upper bound would silently drop transactions/windfalls that a
+    # bill due on the same date would still show, corrupting that cycle's
+    # net_cents. last_cycle_end() computes the real bound the same way
+    # get_forecast() will.
+    query_end_date = last_cycle_end(payload.cycle_type, payload.start_date, payload.end_date)
+
+    transactions_result = await db.execute(
+        select(Transaction).where(
+            Transaction.account_id == account.id,
+            Transaction.date >= payload.start_date,
+            Transaction.date <= query_end_date,
+        )
+    )
+    forecast_transactions = [
+        ForecastTransaction(
+            id=transaction.id,
+            amount_cents=transaction.amount_cents,
+            date=transaction.date,
+            description=transaction.description,
+        )
+        for transaction in transactions_result.scalars().all()
+    ]
+
+    windfalls_result = await db.execute(
+        select(Windfall).where(
+            Windfall.account_id == account.id,
+            Windfall.expected_date >= payload.start_date,
+            Windfall.expected_date <= query_end_date,
+        )
+    )
+    forecast_windfalls = [
+        ForecastWindfall(
+            id=windfall.id,
+            name=windfall.name,
+            amount_cents=windfall.amount_cents,
+            expected_date=windfall.expected_date,
+        )
+        for windfall in windfalls_result.scalars().all()
     ]
 
     forecast = get_forecast(
@@ -46,6 +97,8 @@ async def compute_forecast(
         payload.end_date,
         payload.starting_balance_cents,
         payload.income_per_cycle_cents,
+        transactions=forecast_transactions,
+        windfalls=forecast_windfalls,
     )
 
     # Persist as the account's last-used forecast settings (side effect of an
@@ -74,7 +127,25 @@ async def compute_forecast(
                     )
                     for line in cycle.bills
                 ],
-                cycle_sum_cents=cycle.cycle_sum_cents,
+                transactions=[
+                    ForecastTransactionLine(
+                        transaction_id=line.transaction_id,
+                        amount_cents=line.amount_cents,
+                        date=line.date,
+                        description=line.description,
+                    )
+                    for line in cycle.transactions
+                ],
+                windfalls=[
+                    ForecastWindfallLine(
+                        windfall_id=line.windfall_id,
+                        name=line.name,
+                        amount_cents=line.amount_cents,
+                        expected_date=line.expected_date,
+                    )
+                    for line in cycle.windfalls
+                ],
+                net_cents=cycle.net_cents,
                 running_balance_cents=cycle.running_balance_cents,
             )
             for cycle in forecast.cycles

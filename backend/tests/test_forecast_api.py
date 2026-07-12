@@ -62,6 +62,32 @@ async def test_forecast_computes_cycles_and_running_balance(client: AsyncClient)
     assert body["unscheduled_bills"] == []
 
 
+async def test_forecast_includes_transactions_and_windfalls(client: AsyncClient):
+    account = await _create_account(client)
+    await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions",
+        json={"amount_cents": -2000, "date": "2024-01-10", "description": "oops"},
+    )
+    await client.post(
+        f"/api/v1/accounts/{account['id']}/windfalls",
+        json={"name": "bonus", "amount_cents": 50000, "expected_date": "2024-01-20"},
+    )
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/forecast",
+        json=_forecast_payload(end_date="2024-01-31"),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    first_cycle = body["cycles"][0]
+    assert len(first_cycle["transactions"]) == 1
+    assert len(first_cycle["windfalls"]) == 1
+    # -150000 (bill) - 2000 (transaction) + 50000 (windfall)
+    assert first_cycle["net_cents"] == -102000
+    assert body["ending_balance_cents"] == 100000 + 200000 - 102000
+
+
 async def test_forecast_excludes_disabled_bills(client: AsyncClient):
     account = await _create_account(client)
     await client.post(

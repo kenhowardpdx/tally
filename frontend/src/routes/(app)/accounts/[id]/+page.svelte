@@ -3,6 +3,7 @@
 	import { getAccount, listAccounts } from '$lib/api/accounts';
 	import { createBill, deleteBill, listBills, updateBill } from '$lib/api/bills';
 	import type { BankAccount, Bill, RecurrenceType } from '$lib/api/types';
+	import AccountNav from '$lib/components/AccountNav.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
@@ -138,13 +139,10 @@
 	}
 </script>
 
-<a class="text-sm text-primary underline" href="/accounts">&larr; Accounts</a>
-<div class="mt-2 flex items-center justify-between">
-	<h1 class="text-2xl font-semibold text-text">
-		Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
-	</h1>
-	<a class="text-sm text-primary underline" href="/accounts/{accountId}/forecast">Forecast &rarr;</a>
-</div>
+<AccountNav {accountId} current="bills" />
+<h1 class="mt-2 text-2xl font-semibold text-text">
+	Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+</h1>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>

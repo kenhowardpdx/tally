@@ -36,6 +36,7 @@ from src.forecast import (
     MissingRecurrenceConfig,
     build_cycle,
     get_forecast,
+    last_cycle_end,
 )
 from src.forecast.bill import occurrences_in_range, validate_recurrence_config
 from src.models.bank_account import CycleType
@@ -280,6 +281,22 @@ class TestGetForecastValidation:
         # there) - a forecast for a single day should still show that day.
         result = get_forecast([], CycleType.MONTHLY, date(2024, 1, 1), date(2024, 1, 1), 0, 0)
         assert len(result.cycles) == 1
+
+
+class TestLastCycleEnd:
+    def test_matches_final_cycle_end_date_from_get_forecast(self):
+        # Weekly cycles are 7 days - a 10-day window's last cycle necessarily
+        # runs past end_date, which is exactly the case last_cycle_end exists
+        # to compute correctly for query-bounding callers.
+        start = date(2024, 1, 1)
+        end = date(2024, 1, 10)
+        result = get_forecast([], CycleType.WEEKLY, start, end, 0, 0)
+        assert last_cycle_end(CycleType.WEEKLY, start, end) == result.cycles[-1].end_date
+        assert result.cycles[-1].end_date > end
+
+    def test_end_date_before_start_date_raises(self):
+        with pytest.raises(ValueError):
+            last_cycle_end(CycleType.MONTHLY, date(2024, 2, 1), date(2024, 1, 1))
 
 
 class TestGetForecastTransactionsAndWindfalls:

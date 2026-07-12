@@ -17,7 +17,7 @@
 
 <div class="flex items-center justify-between">
 	<a class="text-sm text-primary underline" href="/accounts">&larr; Accounts</a>
-	<nav class="flex items-center gap-4">
+	<nav class="flex items-center gap-4" aria-label="Account">
 		{#each links as link (link.key)}
 			<a
 				href={link.href}

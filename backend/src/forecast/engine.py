@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -91,6 +92,36 @@ def _cycle_bounds(cycle_type: CycleType, start: date) -> tuple[date, date]:
     raise ValueError(f"Unsupported cycle type: {cycle_type}")  # pragma: no cover
 
 
+def _iter_cycle_bounds(
+    cycle_type: CycleType, start_date: date, end_date: date
+) -> Iterator[tuple[date, date]]:
+    """Yields (cycle_start, cycle_end) for each cycle get_forecast() would
+    generate between start_date and end_date. Shared by get_forecast() and
+    last_cycle_end() so both agree on exactly where cycles fall.
+    """
+    if end_date < start_date:
+        raise ValueError("end_date must be on or after start_date")
+
+    current_start = start_date
+    while current_start <= end_date:
+        current_end, next_start = _cycle_bounds(cycle_type, current_start)
+        yield current_start, current_end
+        current_start = next_start
+
+
+def last_cycle_end(cycle_type: CycleType, start_date: date, end_date: date) -> date:
+    """The end date of the last cycle get_forecast() would generate for the
+    same (cycle_type, start_date, end_date).
+
+    Cycles don't snap to end_date, so the final one can run past it (see
+    _cycle_bounds) - callers that need to bound a query to "every date any
+    cycle could touch" (e.g. an upper bound for loading transactions/
+    windfalls) should use this instead of end_date directly.
+    """
+    *_, (_, last_end) = _iter_cycle_bounds(cycle_type, start_date, end_date)
+    return last_end
+
+
 def get_forecast(
     bills: list[ForecastBill],
     cycle_type: CycleType,
@@ -101,9 +132,6 @@ def get_forecast(
     transactions: list[ForecastTransaction] | None = None,
     windfalls: list[ForecastWindfall] | None = None,
 ) -> ForecastResult:
-    if end_date < start_date:
-        raise ValueError("end_date must be on or after start_date")
-
     transactions = transactions or []
     windfalls = windfalls or []
 
@@ -116,12 +144,10 @@ def get_forecast(
         else:
             schedulable.append(bill)
 
-    current_start = start_date
     running_balance = starting_balance_cents
     cycles: list[ForecastCycle] = []
 
-    while current_start <= end_date:
-        current_end, next_start = _cycle_bounds(cycle_type, current_start)
+    for current_start, current_end in _iter_cycle_bounds(cycle_type, start_date, end_date):
         cycle = build_cycle(schedulable, transactions, windfalls, current_start, current_end)
         running_balance += income_per_cycle_cents + cycle.net_cents
         cycles.append(
@@ -135,7 +161,6 @@ def get_forecast(
                 running_balance_cents=running_balance,
             )
         )
-        current_start = next_start
 
     return ForecastResult(
         cycles=cycles,

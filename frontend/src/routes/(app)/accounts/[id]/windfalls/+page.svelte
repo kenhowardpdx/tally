@@ -43,8 +43,12 @@
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
 		const amountCents = Math.round(Number(amount) * 100);
-		if (!name.trim() || !expectedDate || Number.isNaN(amountCents)) {
-			error = !expectedDate ? 'Please choose an expected date.' : 'Please fill out all fields.';
+		if (!name.trim() || !expectedDate || Number.isNaN(amountCents) || amountCents <= 0) {
+			error = !expectedDate
+				? 'Please choose an expected date.'
+				: amountCents <= 0
+					? 'Amount must be greater than zero.'
+					: 'Please fill out all fields.';
 			return;
 		}
 		creating = true;

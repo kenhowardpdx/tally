@@ -42,7 +42,11 @@ async def compute_forecast(
     ]
 
     transactions_result = await db.execute(
-        select(Transaction).where(Transaction.account_id == account.id)
+        select(Transaction).where(
+            Transaction.account_id == account.id,
+            Transaction.date >= payload.start_date,
+            Transaction.date <= payload.end_date,
+        )
     )
     forecast_transactions = [
         ForecastTransaction(
@@ -54,7 +58,13 @@ async def compute_forecast(
         for transaction in transactions_result.scalars().all()
     ]
 
-    windfalls_result = await db.execute(select(Windfall).where(Windfall.account_id == account.id))
+    windfalls_result = await db.execute(
+        select(Windfall).where(
+            Windfall.account_id == account.id,
+            Windfall.expected_date >= payload.start_date,
+            Windfall.expected_date <= payload.end_date,
+        )
+    )
     forecast_windfalls = [
         ForecastWindfall(
             id=windfall.id,

@@ -7,12 +7,12 @@
 		current: 'bills' | 'transactions' | 'windfalls' | 'forecast';
 	} = $props();
 
-	const links: { key: typeof current; label: string; href: string }[] = [
+	const links = $derived<{ key: typeof current; label: string; href: string }[]>([
 		{ key: 'bills', label: 'Bills', href: `/accounts/${accountId}` },
 		{ key: 'transactions', label: 'Transactions', href: `/accounts/${accountId}/transactions` },
 		{ key: 'windfalls', label: 'Windfalls', href: `/accounts/${accountId}/windfalls` },
 		{ key: 'forecast', label: 'Forecast', href: `/accounts/${accountId}/forecast` }
-	];
+	]);
 </script>
 
 <div class="flex items-center justify-between">

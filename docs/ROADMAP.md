@@ -200,18 +200,41 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 2 — Forecast Engine
 
-**Status**: not started
+**Status**: code complete
 
-- [ ] 2.1 Port `Amount`/`Bill`/`Cycle`/`getForecast` to Python with `Decimal` math;
-      port the existing test cases (`packages/forecast/src/__tests__/*`) to pytest as
-      the correctness baseline
-- [ ] 2.2 Extend the engine for the new recurrence types beyond monthly/annual (weekly,
-      semimonthly, custom-interval-days)
-- [ ] 2.3 Backend forecast endpoint (account, date range, starting balance, income per
-      cycle → cycle-by-cycle breakdown)
-- [ ] 2.4 Frontend forecast view (Svelte equivalent of `clientv0`'s `Forecast.tsx`:
-      cycle rows with running total, expandable to show which bills/transactions hit
-      that cycle)
+- [x] 2.1 Port `Bill`/`Cycle`/`getForecast` to Python (`backend/src/forecast/`); no
+      `Amount`/`Decimal` needed - `Bill.amount_cents` is already exact integer cents, so
+      the whole engine is plain int arithmetic. Ported the bi-weekly/monthly golden-value
+      test cases from `packages/forecast/src/__tests__/{cycle,forecast}.test.ts` directly
+      (exact cents-converted parity); the semimonthly ("10th & 25th") cases were **not**
+      ported as-is - the reference's day-bucket boundary for snapping onto the 10th/25th
+      anchor is itself part of the `start`/`next` aliasing bug this port fixes rather than
+      reproduces (day 21 snapped to the 25th in the reference, skipping the still-active
+      10th-24th period), so those pin this engine's own corrected, self-verified output
+      instead. See `backend/tests/test_forecast_engine.py`'s module docstring.
+- [x] 2.2 Extended for weekly/semimonthly/custom_days per-bill recurrence (`RecurrenceType`,
+      already modeled in Phase 1), plus a `weekly` *cycle* type the reference left as
+      `throw new Error("NOT IMPLEMENTED")`. Also generalized beyond the reference's
+      single-occurrence-per-cycle model: a weekly-recurring bill inside a monthly forecast
+      cycle can genuinely recur more than once in that window, and now all occurrences
+      count (see `test_weekly_bill_recurs_multiple_times_within_a_monthly_cycle`).
+      Bills needing `recurrence_config` data that doesn't exist yet (semimonthly,
+      custom_days - 1.7 was deferred) are skipped with a reason rather than guessed at or
+      failing the whole request (`ForecastResponse.unscheduled_bills`).
+- [x] 2.3 `POST /api/v1/accounts/{id}/forecast` (`backend/src/api/forecast.py`) - only
+      `enabled` bills, scoped via the existing `get_owned_bank_account` pattern. Also
+      persists the request's five params onto the account (`BankAccount.forecast_*`
+      columns, new migration) as a side effect, so `GET .../accounts/{id}` returns the
+      last-used settings - added after a plan review caught that the reference's
+      client persisted these to `localforage` for exactly this reason (pay cycles are
+      ~2 weeks apart; don't make the user re-enter the starting balance every visit).
+- [x] 2.4 `frontend/src/routes/(app)/accounts/[id]/forecast/+page.svelte` - a separate
+      route rather than the reference's same-page tab (fits SvelteKit's routing model
+      better, keeps the bills page from growing further); form prefilled from the
+      account's saved settings, explicit "Calculate" submit (a real API round-trip now,
+      not the reference's free client-side recompute-on-keystroke); cycle rows expand
+      in place to show bill line items, with the reference's red/gray
+      negative/low-balance row coloring ported to Tailwind classes.
 
 ## Phase 3 — Transactions & Windfalls
 
@@ -315,3 +338,13 @@ session (or a fresh Claude Code instance) orient in under a minute.
   popover calendar, no new dependency) components; "Recurrence" renamed to "Frequency" with
   human-readable value labels everywhere. Left 1.7 alone (recurrence-config UI) per its own
   "not yet designed" flag. Next: scope 1.7, or start Phase 2.
+- 2026-07-12: Phase 2 (forecast engine) shipped — ported the reference `kenhowardpdx/bank`
+  engine to `backend/src/forecast/`, extended for Tally's full recurrence model, and added
+  the `POST .../forecast` endpoint + `/accounts/[id]/forecast` Svelte page. Persisted
+  forecast settings onto `BankAccount` (new columns/migration) after catching mid-plan that
+  the reference persists these client-side for a real reason (~2-week pay cycles, don't
+  re-enter the starting balance every visit) — worth remembering for future phases: check
+  whether "ephemeral request params" in a reference implementation are actually ephemeral,
+  or just persisted somewhere this port doesn't have yet. 1.7 (recurrence-config UI) is
+  still open and still blocks semimonthly/custom_days bills from being real (they show up
+  as "unscheduled" in any forecast). Next: 1.7, or Phase 3 (transactions & windfalls).

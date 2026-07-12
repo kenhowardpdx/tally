@@ -71,6 +71,24 @@ resource "aws_cloudfront_distribution" "frontend" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host_header.id
   }
 
+  # SPA deep-link support: the S3 origin is accessed via OAC against the REST
+  # API endpoint (not the S3 website endpoint), so a missing key like
+  # /dashboard comes back as a raw 403 AccessDenied (OAC-signed requests can't
+  # distinguish "missing" from "no permission") rather than a 404. Serve
+  # index.html with a 200 for both so SvelteKit's client-side router can
+  # handle the route itself.
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
   aliases     = var.aliases
   price_class = "PriceClass_100"
 

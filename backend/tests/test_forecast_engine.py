@@ -193,6 +193,20 @@ class TestRecurrenceConfigValidation:
     def test_semimonthly_missing_config_raises(self):
         bill = make_bill(1, "rent", 50000, date(2024, 1, 1), recurrence_type=RecurrenceType.SEMIMONTHLY)
         assert validate_recurrence_config(bill) is not None
+
+    @pytest.mark.parametrize("days", [[0, 25], [10, 32], [-5, 10]])
+    def test_semimonthly_out_of_range_days_raises_instead_of_crashing(self, days):
+        # date(year, month, day) raises ValueError for day outside 1-31 - out
+        # of range recurrence_config.days must be treated as missing config
+        # (skip + reason), not reach date() construction and 500 the request.
+        bill = make_bill(
+            1, "rent", 50000, date(2024, 1, 1),
+            recurrence_type=RecurrenceType.SEMIMONTHLY,
+            recurrence_config={"days": days},
+        )
+        assert validate_recurrence_config(bill) is not None
+        with pytest.raises(MissingRecurrenceConfig):
+            occurrences_in_range(bill, date(2024, 3, 1), date(2024, 3, 31))
         with pytest.raises(MissingRecurrenceConfig):
             occurrences_in_range(bill, date(2024, 3, 1), date(2024, 3, 31))
 

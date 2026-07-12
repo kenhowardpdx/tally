@@ -61,14 +61,24 @@
 
 	async function handleCalculate(event: SubmitEvent) {
 		event.preventDefault();
+		const startingBalanceCents = Math.round(Number(startingBalance) * 100);
+		const incomePerCycleCents = Math.round(Number(incomePerCycle) * 100);
+		if (
+			!startDate ||
+			!endDate ||
+			Number.isNaN(startingBalanceCents) ||
+			Number.isNaN(incomePerCycleCents)
+		) {
+			return;
+		}
 		calculating = true;
 		error = null;
 		try {
 			forecast = await computeForecast(accountId, {
 				start_date: startDate,
 				end_date: endDate,
-				starting_balance_cents: Math.round(Number(startingBalance) * 100),
-				income_per_cycle_cents: Math.round(Number(incomePerCycle) * 100),
+				starting_balance_cents: startingBalanceCents,
+				income_per_cycle_cents: incomePerCycleCents,
 				cycle_type: cycleType
 			});
 			expanded = {};

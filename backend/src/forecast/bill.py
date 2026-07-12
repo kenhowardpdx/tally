@@ -45,8 +45,12 @@ def validate_recurrence_config(bill: ForecastBill) -> str | None:
     required for its recurrence_type, else None."""
     if bill.recurrence_type == RecurrenceType.SEMIMONTHLY:
         days = bill.recurrence_config.get("days")
-        if not isinstance(days, list) or not days or not all(isinstance(d, int) for d in days):
-            return "semimonthly bills need recurrence_config.days, e.g. [10, 25]"
+        if (
+            not isinstance(days, list)
+            or not days
+            or not all(isinstance(d, int) and 1 <= d <= 31 for d in days)
+        ):
+            return "semimonthly bills need recurrence_config.days as integers 1-31, e.g. [10, 25]"
     if bill.recurrence_type == RecurrenceType.CUSTOM_DAYS:
         interval = bill.recurrence_config.get("interval_days")
         if not isinstance(interval, int) or interval <= 0:

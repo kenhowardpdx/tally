@@ -374,9 +374,9 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 4 — Multi-account dashboard & polish
 
-**Status**: not started
+**Status**: code complete
 
-- [ ] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views).
+- [x] 4.1 Dashboard aggregating all of a user's accounts (combined + per-account views).
       Per account, a "current cycle" snapshot card: the pay cycle containing today (date
       range, bills due, running balance) at a glance, linking through to the full forecast
       page for that account. Reuses the forecast engine (`backend/src/forecast/`) rather
@@ -388,9 +388,18 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       (`BankAccount.forecast_*`, persisted since Phase 2.3) and stepping forward/backward
       to the cycle that actually contains today, rather than naively calling
       `get_forecast(start_date=today, end_date=today, ...)` (which would anchor a new
-      cycle AT today instead of finding the in-progress one).
-- [ ] 4.2 UI/design pass — consistent Svelte component system, responsive layout. Still open:
-      general responsive layout pass, plus whatever else turns up. Done so far:
+      cycle AT today instead of finding the in-progress one). Landed as
+      `find_current_cycle_bounds` (`backend/src/forecast/engine.py`) - weekly/biweekly/
+      monthly use a closed-form period estimate from the anchor plus a short correction
+      loop; semimonthly ignores the anchor entirely and derives its fixed 10th/25th
+      boundary straight from today's day-of-month, since it's self-anchoring. New
+      `GET /api/v1/dashboard` (`backend/src/api/dashboard.py`) re-runs `get_forecast()` per
+      account bounded to `[forecast_start_date, current-cycle-end]` and returns the last
+      generated cycle plus a combined ending balance; accounts that have never had a
+      forecast run report `configured: false` instead of guessing at settings. Frontend:
+      `frontend/src/routes/(app)/dashboard/+page.svelte` replaces the dev-only placeholder
+      with a combined-balance figure and per-account cards.
+- [x] 4.2 UI/design pass — consistent Svelte component system, responsive layout. Done:
       - [x] a real date-picker component (`frontend/src/lib/components/DatePicker.svelte`,
         a popover calendar) replacing the native `<input type="date">` in the bill form
       - [x] a `Select` component styled to match `Input`
@@ -399,17 +408,47 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       - [x] renamed the "Recurrence" label to "Frequency" in the bill form
       - [x] human-readable labels for recurrence values (`frontend/src/lib/recurrence.ts`),
         used in both the dropdown and the bills table
-- [ ] 4.3 Error handling, loading states, empty states throughout
-- [ ] 4.4 Test coverage: forecast engine (pytest), key frontend components
-- [ ] 4.5 In-app help: a glossary/definitions page explaining Tally-specific terms (Cycle
+      - [x] general responsive layout pass - header nav wraps on narrow screens; found and
+        fixed a real overflow bug via in-browser mobile testing (375px): `DatePicker`'s and
+        `Select`'s popovers anchored to the trigger's left edge and ran off-screen whenever
+        the trigger sat right of center (e.g. a form's 2nd/3rd field), made worse by
+        `DatePicker`'s fixed `w-64` and `Select`'s `min-w-max` (for long option labels like
+        "Semimonthly (10th & 25th)"). Both now measure the trigger's position on open and
+        flip to right-anchored past the viewport midpoint, plus cap width to the viewport.
+- [x] 4.3 Error handling, loading states, empty states throughout. Audited every page -
+      loading/error/empty states were already consistent from Phase 1-3 (a shared
+      `error`/`loading` `$state` pattern per page); added the one real gap found (the
+      forecast page rendered its form with default placeholder values during the initial
+      account fetch instead of a loading indicator) and fixed a pre-existing whitespace bug
+      on four page headings (`Bills{#if account} (...)​{/if}` rendered with no space before
+      the parenthesis - Svelte trims leading whitespace at a block's edge; `{' '}` survives
+      the trim where a literal space doesn't).
+- [x] 4.4 Test coverage: forecast engine (pytest), key frontend components. Backend: pytest
+      coverage for `find_current_cycle_bounds` (11 cases spanning all four cycle types, plus
+      one property test cross-checking every anchored type against `iter_cycle_bounds`) and
+      the new `/dashboard` and `/demo/forecast` endpoints (133 backend tests total). Frontend
+      had no working test runner since Phase 0 (`package.json`'s `test` script was a no-op
+      stub) - wired up Vitest + `@testing-library/svelte` + jsdom
+      (`frontend/vite.config.ts`, scoped to `mode === 'test'` so the real dev/build config
+      is untouched) and added 17 tests covering `Tooltip` (keyboard-accessible hover/focus
+      trigger), `Select`/`DatePicker` (the new edge-aware popover positioning from 4.2),
+      `Badge`, and a `glossary.ts` data-integrity check. Already wired into the existing
+      `frontend-test` CI job via `yarn test` - no workflow changes needed.
+- [x] 4.5 In-app help: a glossary/definitions page explaining Tally-specific terms (Cycle
       Type, Frequency, Windfall, the semimonthly 10th/25th convention, etc. — the concepts
       this app introduces that aren't self-explanatory from the UI alone), plus contextual
       tooltips on the fields that use this vocabulary (the bill form's Frequency select,
       the forecast form's Cycle select, the windfall form) so users get the definition in
       the moment instead of leaving the page to look it up. No tooltip component exists
       yet (`frontend/src/lib/components/`) — needs a small reusable one, hover/focus
-      triggered and keyboard accessible.
-- [ ] 4.6 Logged-out homepage: replace the current placeholder root page
+      triggered and keyboard accessible. Landed as `Tooltip.svelte` (a real focusable
+      `<button aria-describedby>`, shown via CSS `:hover`/`:focus-within` - no JS
+      positioning library) plus a shared `frontend/src/lib/glossary.ts` term list reused by
+      both the new `/glossary` page and the inline tooltips so definitions can't drift
+      apart. `Select` gained an optional `tooltip` prop for the Frequency/Cycle selects; the
+      windfalls page (no `Select` field to attach one to) gets its own `Tooltip` on the page
+      heading instead.
+- [x] 4.6 Logged-out homepage: replace the current placeholder root page
       (`frontend/src/routes/+page.svelte`, currently just a couple of sentences before
       redirecting authenticated users to `/accounts`) with real marketing content — what
       Tally is, why to sign up — plus an interactive demo: a pre-selected sample list of
@@ -417,7 +456,17 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       forecast, no login required. Needs a public, unauthenticated forecast endpoint that
       reuses `backend/src/forecast/get_forecast` directly against demo data in the request
       (no DB writes, no account, no auth) rather than reimplementing the engine in JS for
-      the demo — keeps the demo's math guaranteed identical to the real product's.
+      the demo — keeps the demo's math guaranteed identical to the real product's. Landed
+      as `POST /api/v1/demo/forecast` (`backend/src/api/demo.py`, no `Depends(get_current_user)`
+      at all - truly public) with a request-supplied bill list capped at 25 bills and a
+      366-day window (unauthenticated with no rate limiting of its own, so the request body
+      itself bounds how much computation one call can force). The homepage
+      (`frontend/src/routes/+page.svelte`) now has a value-prop hero, three feature-highlight
+      cards, and the interactive demo widget - three seeded sample bills the visitor can add
+      to/remove from, a starting-balance/income/cycle form, and a read-only forecast table
+      reusing the same expandable-row pattern as the real forecast page. A dedicated
+      `frontend/src/lib/api/demo.ts` client deliberately bypasses `apiFetch` (which attaches
+      an Auth0 access token via `getAccessToken()`, throwing for a logged-out visitor).
 
 ## Phase 5 — Production hardening (ongoing, lower priority)
 
@@ -566,3 +615,22 @@ session (or a fresh Claude Code instance) orient in under a minute.
   elsewhere, from PR #94). Next: Phase 4 (multi-account dashboard & polish), or any
   previously-logged follow-up (1.7 recurrence-config UI still open; 4.1/4.5/4.6 follow-ups
   from earlier sessions).
+- 2026-07-12: Phase 4 (multi-account dashboard & polish) shipped end-to-end (4.1-4.6). Backend:
+  `find_current_cycle_bounds` locates the pay cycle containing today for an account's saved
+  anchor (closed-form estimate + correction loop for weekly/biweekly/monthly, direct
+  10th/25th derivation for self-anchoring semimonthly), backing a new `GET /api/v1/dashboard`
+  that reuses `get_forecast()` per account for a combined-balance + per-account current-cycle
+  view; a new public, unauthenticated `POST /api/v1/demo/forecast` (capped at 25 bills/366
+  days) runs the same engine against request-supplied data for the logged-out homepage's demo,
+  keeping its math identical to the real product instead of a parallel JS reimplementation.
+  Frontend: real dashboard cards, a marketing homepage with the interactive demo, a
+  `Tooltip.svelte` + shared `glossary.ts` term list powering both a new `/glossary` page and
+  inline field tooltips (Frequency/Cycle selects, windfalls heading), and a responsive pass
+  that turned up (via actual 375px-viewport browser testing, not just code review) a real bug:
+  `DatePicker`/`Select` popovers overflowed the viewport whenever their trigger sat right of
+  center, now fixed with edge-aware anchoring. Also set up the frontend's first working test
+  runner (Vitest + `@testing-library/svelte`, 17 tests) since `package.json`'s `test` script
+  had been a no-op stub since Phase 0 - already wired into the existing `frontend-test` CI job.
+  Folded in this session because it hadn't been merged yet: Phase 3's cycle-reconciliation work
+  from the prior session (3.5-3.11) - both ship together in the PR this session opens. Next:
+  Phase 5 (production hardening), or any newly-discovered polish item.

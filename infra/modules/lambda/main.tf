@@ -14,16 +14,15 @@ resource "aws_iam_role" "lambda_exec" {
   })
 }
 
-# Attach AWS managed policies for Lambda execution and S3 access
+# CloudWatch Logs write access only. The Lambda deployment package is fetched
+# by AWS's own Lambda service (s3_bucket/s3_key above) using its own
+# infrastructure permissions, not by code running inside the function - the
+# app itself never calls the S3 API (no boto3/S3 usage in backend/src), so the
+# account-wide AmazonS3ReadOnlyAccess this previously carried was unused,
+# unnecessary access to every bucket in the account (Phase 5 security review).
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-
-resource "aws_iam_role_policy_attachment" "lambda_s3_read" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
 
 

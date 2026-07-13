@@ -14,8 +14,13 @@ from src.api import (
     windfalls,
 )
 from src.core.auth import get_current_user
+from src.core.logging import configure_logging, log_requests
+
+configure_logging()
 
 app = FastAPI()
+
+app.middleware("http")(log_requests)
 
 app.include_router(accounts.router)
 app.include_router(bills.router)

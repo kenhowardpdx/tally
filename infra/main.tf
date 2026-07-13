@@ -113,14 +113,3 @@ module "api_gateway" {
   api_name            = "tally-api"
   aws_region          = var.aws_region
 }
-
-# module "acm" {
-#   source = "./modules/acm"
-#   # Add acm module variables here
-# }
-
-
-# module "auth0" {
-#   source = "./modules/auth0"
-#   # Add auth0 module variables here
-# }

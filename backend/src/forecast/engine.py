@@ -94,12 +94,14 @@ def _cycle_bounds(cycle_type: CycleType, start: date) -> tuple[date, date]:
     raise ValueError(f"Unsupported cycle type: {cycle_type}")  # pragma: no cover
 
 
-def _iter_cycle_bounds(
+def iter_cycle_bounds(
     cycle_type: CycleType, start_date: date, end_date: date
 ) -> Iterator[tuple[date, date]]:
     """Yields (cycle_start, cycle_end) for each cycle get_forecast() would
-    generate between start_date and end_date. Shared by get_forecast() and
-    last_cycle_end() so both agree on exactly where cycles fall.
+    generate between start_date and end_date. Shared by get_forecast(),
+    last_cycle_end(), and build_bill_history() so all three agree on exactly
+    where cycles fall. Public (no leading underscore) for that last caller,
+    which lives outside this module.
     """
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
@@ -121,9 +123,9 @@ def last_cycle_end(cycle_type: CycleType, start_date: date, end_date: date) -> d
     windfalls) should use this instead of end_date directly.
     """
     last_end: date | None = None
-    for _, current_end in _iter_cycle_bounds(cycle_type, start_date, end_date):
+    for _, current_end in iter_cycle_bounds(cycle_type, start_date, end_date):
         last_end = current_end
-    assert last_end is not None  # _iter_cycle_bounds always yields at least one cycle
+    assert last_end is not None  # iter_cycle_bounds always yields at least one cycle
     return last_end
 
 
@@ -168,7 +170,7 @@ def get_forecast(
     running_balance = starting_balance_cents
     cycles: list[ForecastCycle] = []
 
-    for current_start, current_end in _iter_cycle_bounds(cycle_type, start_date, end_date):
+    for current_start, current_end in iter_cycle_bounds(cycle_type, start_date, end_date):
         cycle = build_cycle(
             schedulable,
             transactions,

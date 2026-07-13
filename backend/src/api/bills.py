@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.bills_csv import bills_to_csv, parse_csv_rows
 from src.core.database import get_db
+from src.forecast import ForecastBill, ForecastCycleOverride, build_bill_history, last_cycle_end
 from src.forecast.bill import validate_recurrence_config
-from src.models import BankAccount, Bill, RecurrenceType, User
+from src.models import BankAccount, Bill, CycleOverride, CycleType, RecurrenceType, User
 from src.schemas.bill import BillCreate, BillRead, BillUpdate
+from src.schemas.bill_history import BillHistoryEntry, BillHistoryResponse
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/bills", tags=["bills"])
 
@@ -119,6 +123,94 @@ async def update_bill(
     await db.commit()
     await db.refresh(bill)
     return bill
+
+
+@router.get("/{bill_id}/history", response_model=BillHistoryResponse)
+async def get_bill_history(
+    db: AsyncSession = Depends(get_db),
+    account: BankAccount = Depends(get_owned_bank_account),
+    bill: Bill = Depends(_get_owned_bill),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    cycle_type: CycleType | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> BillHistoryResponse:
+    # cycle_type isn't a bill-level concept (it's the account's pay-cycle
+    # cadence, same as /forecast) - default to whatever the account last used
+    # so a plain GET with no params lines up with the cycles the user has
+    # actually been reconciling against.
+    effective_cycle_type = cycle_type or account.forecast_cycle_type or CycleType.MONTHLY
+    effective_start = start_date or bill.start_date
+    effective_end = end_date or date.today()
+    if effective_end < effective_start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="end_date must be on or after start_date",
+        )
+
+    reason = validate_recurrence_config(bill.recurrence_type, bill.recurrence_config)
+    if reason:
+        return BillHistoryResponse(bill_id=bill.id, total=0, entries=[])
+
+    forecast_bill = ForecastBill(
+        id=bill.id,
+        name=bill.name,
+        amount_cents=bill.amount_cents,
+        recurrence_type=bill.recurrence_type,
+        recurrence_config=bill.recurrence_config,
+        start_date=bill.start_date,
+        end_date=bill.end_date,
+    )
+
+    # Bound the same way /forecast does: the last cycle can run past
+    # effective_end depending on cycle_type, so query overrides up to its
+    # real end rather than effective_end directly.
+    query_end_date = last_cycle_end(effective_cycle_type, effective_start, effective_end)
+    overrides_result = await db.execute(
+        select(CycleOverride).where(
+            CycleOverride.account_id == account.id,
+            CycleOverride.bill_id == bill.id,
+            CycleOverride.cycle_start_date >= effective_start,
+            CycleOverride.cycle_start_date <= query_end_date,
+        )
+    )
+    overrides_by_cycle_start = {
+        override.cycle_start_date: ForecastCycleOverride(
+            bill_id=override.bill_id,
+            windfall_id=override.windfall_id,
+            cycle_start_date=override.cycle_start_date,
+            completed=override.completed,
+            override_amount_cents=override.override_amount_cents,
+            notes=override.notes,
+        )
+        for override in overrides_result.scalars().all()
+    }
+
+    lines = build_bill_history(
+        forecast_bill, effective_cycle_type, effective_start, effective_end, overrides_by_cycle_start
+    )
+    lines.sort(key=lambda line: line.due_date, reverse=True)
+
+    total = len(lines)
+    page = lines[offset : offset + limit]
+    return BillHistoryResponse(
+        bill_id=bill.id,
+        total=total,
+        entries=[
+            BillHistoryEntry(
+                cycle_start_date=line.cycle_start_date,
+                cycle_end_date=line.cycle_end_date,
+                due_date=line.due_date,
+                expected_amount_cents=line.expected_amount_cents,
+                actual_amount_cents=line.actual_amount_cents,
+                completed=line.completed,
+                notes=line.notes,
+                variance_cents=line.variance_cents,
+            )
+            for line in page
+        ],
+    )
 
 
 @router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)

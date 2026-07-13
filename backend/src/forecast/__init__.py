@@ -1,4 +1,5 @@
 from src.forecast.bill import ForecastBill, MissingRecurrenceConfig
+from src.forecast.bill_history import BillHistoryLine, build_bill_history
 from src.forecast.cycle import (
     Cycle,
     CycleBillLine,
@@ -12,12 +13,14 @@ from src.forecast.engine import (
     ForecastResult,
     UnscheduledBill,
     get_forecast,
+    iter_cycle_bounds,
     last_cycle_end,
 )
 from src.forecast.transaction import ForecastTransaction
 from src.forecast.windfall import ForecastWindfall
 
 __all__ = [
+    "BillHistoryLine",
     "Cycle",
     "CycleBillLine",
     "CycleTransactionLine",
@@ -30,7 +33,9 @@ __all__ = [
     "ForecastWindfall",
     "MissingRecurrenceConfig",
     "UnscheduledBill",
+    "build_bill_history",
     "build_cycle",
     "get_forecast",
+    "iter_cycle_bounds",
     "last_cycle_end",
 ]

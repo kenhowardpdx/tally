@@ -139,9 +139,15 @@ async def get_bill_history(
     # cycle_type isn't a bill-level concept (it's the account's pay-cycle
     # cadence, same as /forecast) - default to whatever the account last used
     # so a plain GET with no params lines up with the cycles the user has
-    # actually been reconciling against.
+    # actually been reconciling against. Cycle boundaries are computed by
+    # stepping forward from start_date (see iter_cycle_bounds), so a
+    # cycle_overrides row's cycle_start_date only matches what we regenerate
+    # here if we anchor on the same start_date /forecast used
+    # (account.forecast_start_date) - anchoring on the bill's own start_date
+    # instead would produce a different, non-overlapping series of cycle
+    # boundaries whenever the two dates disagree.
     effective_cycle_type = cycle_type or account.forecast_cycle_type or CycleType.MONTHLY
-    effective_start = start_date or bill.start_date
+    effective_start = start_date or account.forecast_start_date or bill.start_date
     effective_end = end_date or date.today()
     if effective_end < effective_start:
         raise HTTPException(

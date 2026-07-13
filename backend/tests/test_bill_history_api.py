@@ -35,6 +35,50 @@ async def _create_bill(client: AsyncClient, account_id: int, **overrides) -> dic
     return res.json()
 
 
+async def test_history_defaults_to_account_forecast_anchor_not_bill_start_date(
+    client: AsyncClient,
+):
+    # A bill starting on the 1st but a forecast anchored on the 12th produces
+    # a different series of cycle boundaries (e.g. "12th-11th" vs "1st-31st")
+    # - cycle_overrides rows are keyed against whatever anchor /forecast
+    # actually used, so history's default start_date must match that anchor
+    # (account.forecast_start_date), not fall back to the bill's own
+    # start_date, or a real override would silently not show up.
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    await client.post(
+        f"/api/v1/accounts/{account['id']}/forecast",
+        json={
+            "start_date": "2024-01-12",
+            "end_date": "2024-01-12",
+            "starting_balance_cents": 0,
+            "income_per_cycle_cents": 0,
+            "cycle_type": "monthly",
+        },
+    )
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2024-01-12",
+            "completed": True,
+            "override_amount_cents": 160000,
+        },
+    )
+
+    res = await client.get(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/history",
+        params={"end_date": "2024-02-01"},
+    )
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    assert any(e["cycle_start_date"] == "2024-01-12" for e in entries)
+    matching = next(e for e in entries if e["cycle_start_date"] == "2024-01-12")
+    assert matching["actual_amount_cents"] == 160000
+    assert matching["completed"] is True
+
+
 async def test_history_lists_one_entry_per_monthly_occurrence(client: AsyncClient):
     account = await _create_account(client)
     bill = await _create_bill(client, account["id"])

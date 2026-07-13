@@ -188,3 +188,48 @@ export interface ForecastResponse {
 	ending_balance_cents: number;
 	unscheduled_bills: UnscheduledBill[];
 }
+
+export interface DashboardAccountSummary {
+	account_id: number;
+	account_name: string;
+	institution: string | null;
+	// False if the account has never had a forecast run - every field below
+	// is null/empty in that case.
+	configured: boolean;
+	cycle_type: CycleType | null;
+	cycle_start_date: string | null;
+	cycle_end_date: string | null;
+	// True if today is before the account's saved forecast_start_date - this
+	// is the first upcoming cycle, not one actually in progress.
+	is_upcoming: boolean;
+	starting_balance_cents: number | null;
+	ending_balance_cents: number | null;
+	bills: ForecastBillLine[];
+	transactions: ForecastTransactionLine[];
+	windfalls: ForecastWindfallLine[];
+	net_cents: number | null;
+}
+
+export interface DashboardResponse {
+	accounts: DashboardAccountSummary[];
+	combined_ending_balance_cents: number;
+}
+
+export interface DemoBill {
+	id: number;
+	name: string;
+	amount_cents: number;
+	recurrence_type: RecurrenceType;
+	recurrence_config?: Record<string, unknown>;
+	start_date: string;
+	end_date?: string | null;
+}
+
+export interface DemoForecastRequest {
+	bills: DemoBill[];
+	cycle_type: CycleType;
+	start_date: string;
+	end_date: string;
+	starting_balance_cents: number;
+	income_per_cycle_cents: number;
+}

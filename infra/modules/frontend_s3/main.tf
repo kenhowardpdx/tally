@@ -4,6 +4,20 @@ resource "aws_s3_bucket" "frontend" {
   tags          = var.tags
 }
 
+# Belt-and-suspenders alongside the SourceArn-scoped bucket policy below: the
+# policy only ever grants CloudFront's service principal access (not "public"
+# in AWS's sense, so Block Public Access doesn't interfere with it), but an
+# explicit block still guards against a future accidental public ACL/policy
+# on this bucket. Matches backend_s3's posture (see modules/backend_s3/main.tf).
+resource "aws_s3_bucket_public_access_block" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 
 resource "aws_s3_bucket_website_configuration" "frontend" {
   bucket = aws_s3_bucket.frontend.id

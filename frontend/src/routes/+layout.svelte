@@ -2,6 +2,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import Button from '$lib/components/Button.svelte';
+	import Footer from '$lib/components/Footer.svelte';
 	import { initAuth, isAuthenticated, isLoading, login, logout, user } from '$lib/auth';
 	import { onMount } from 'svelte';
 
@@ -16,7 +17,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="min-h-screen bg-background">
+<div class="flex min-h-screen flex-col bg-background">
 	<header
 		class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-surface px-4 py-4 sm:px-6"
 	>
@@ -42,7 +43,9 @@
 		{/if}
 	</header>
 
-	<main class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+	<main class="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
 		{@render children?.()}
 	</main>
+
+	<Footer />
 </div>

@@ -9,6 +9,7 @@ from src.api import (
     dashboard,
     demo,
     forecast,
+    me,
     transactions,
     windfalls,
 )
@@ -22,6 +23,7 @@ app.include_router(cycle_overrides.router)
 app.include_router(dashboard.router)
 app.include_router(demo.router)
 app.include_router(forecast.router)
+app.include_router(me.router)
 app.include_router(transactions.router)
 app.include_router(windfalls.router)
 

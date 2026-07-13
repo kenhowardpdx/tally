@@ -233,3 +233,8 @@ export interface DemoForecastRequest {
 	starting_balance_cents: number;
 	income_per_cycle_cents: number;
 }
+
+export interface ConsentStatus {
+	terms_accepted: boolean;
+	terms_accepted_at: string | null;
+}

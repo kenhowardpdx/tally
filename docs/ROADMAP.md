@@ -512,26 +512,61 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
 
 ## Phase 5 — Production hardening (ongoing, lower priority)
 
+**Status**: first pass complete - see [docs/OPERATIONS.md](OPERATIONS.md) for the full detail
+behind every item below. Legal review and the Neon plan/PITR-window decision are called out
+below as items only Ken can close (real money/real lawyer, not something to guess at).
+
 - [ ] Legal/compliance review of the Privacy Policy and Terms and Conditions pages
       (`frontend/src/routes/privacy/`, `frontend/src/routes/terms/`) before treating them as
-      production-ready - current copy is a reasonable placeholder, not lawyer-reviewed.
-      Revisit at the same time whether signup-time Auth0 consent (option 1 in Phase 4.7's
-      note above) is worth the tenant-configuration overhead, if a stricter guarantee than
-      "consent immediately after account creation" becomes a real requirement.
-- [ ] Structured logging / basic observability within free-tier limits (#19)
-- [ ] Confirm Neon's backup/retention behavior meets expectations, plus a documented
-      restore drill / disaster-recovery path (#20)
-- [ ] Periodic cost review (matches CLAUDE.md's cost-first philosophy)
-- [ ] Security hardening review for IAM/Auth0/API/storage settings, keeping the current
-      cost-first architecture in mind (#21)
-- [ ] Production deployment audit: reconcile the older infra/bootstrap issues with the
+      production-ready - current copy is a reasonable placeholder, not lawyer-reviewed. **Not
+      done this pass** - needs an actual lawyer, not something to guess at.
+- [x] Auth0 consent-timing tradeoff (JIT provisioning happens slightly before consent capture,
+      noted in Phase 4.7 above) - **reviewed, decision: keep as documented/accepted risk, no
+      code or Auth0 tenant change**. The interstitial already blocks every app route
+      immediately after login (see Phase 4.7), so the unprotected window is only the instant
+      between JIT provisioning and the interstitial rendering - not zero, but not worth
+      customizing Auth0's hosted Universal Login (a dashboard-only, out-of-version-control
+      change with no local/CI equivalent, per Phase 4.7's original reasoning, which still
+      holds). Revisit only if a real compliance requirement forces a stricter guarantee than
+      "consent immediately after account creation."
+- [x] Structured logging / basic observability within free-tier limits (#19) - JSON structured
+      logging + per-request access log (`backend/src/core/logging.py`); CloudWatch Logs
+      Insights queryable. One known gap flagged with an exact fix command in
+      `docs/OPERATIONS.md` (Lambda log group's retention policy needs a one-time manual
+      `aws logs put-retention-policy` call - blocked this session by an expired AWS SSO token).
+- [x] Confirm Neon's backup/retention behavior meets expectations, plus a documented
+      restore drill / disaster-recovery path (#20) - documented in `docs/OPERATIONS.md`
+      (PITR windows by plan, branching-based restore drill steps). **Flagged for Ken**: confirm
+      which Neon plan prod is actually on, since that determines the real recovery window
+      (Free's 6 hours vs. Launch's 7 days) - a cost/risk tradeoff only Ken can decide.
+- [x] Periodic cost review (matches CLAUDE.md's cost-first philosophy) - `docs/OPERATIONS.md`'s
+      Cost Review table; one free-tier cliff flagged (API Gateway's 12-months-from-account-
+      creation REST API free tier, not evergreen like Lambda/CloudWatch Logs).
+- [x] Security hardening review for IAM/Auth0/API/storage settings, keeping the current
+      cost-first architecture in mind (#21) - removed the Lambda role's unused, account-wide
+      `AmazonS3ReadOnlyAccess` attachment; added a public-access-block to the frontend S3
+      bucket. Full review (what was checked, what was intentionally left as-is, what needs
+      live AWS access to finish) in `docs/OPERATIONS.md`.
+- [x] Production deployment audit: reconcile the older infra/bootstrap issues with the
       current Terraform + GitHub Actions reality, document what is already live, and split
-      any remaining gaps into smaller concrete follow-ups (#8, #9, #10, #12, #17, #18)
-- [ ] DNS/domain decision: either move DNS to Route 53 and cut over from Hover, or
-      explicitly keep DNS outside AWS and document the manual process/rollback (#13, #14)
-- [ ] End-to-end production verification across Auth0, CloudFront, API Gateway, Lambda,
-      and Neon (#22)
-- [ ] System / ops / API documentation pass, including deployment/runbook coverage (#23)
+      any remaining gaps into smaller concrete follow-ups (#8, #9, #10, #12, #17, #18) - full
+      issue-by-issue reconciliation table in `docs/OPERATIONS.md`; every issue's intent has
+      shipped (mostly via GitHub Actions automation instead of the originally-scoped local
+      scripts).
+- [x] DNS/domain decision: either move DNS to Route 53 and cut over from Hover, or
+      explicitly keep DNS outside AWS and document the manual process/rollback (#13, #14) -
+      **decision: keep DNS at Hover**, no Route 53 migration. Reasoning (pure added
+      $0.50/month cost, no feature Tally needs at this scale) in `docs/OPERATIONS.md`.
+- [x] End-to-end production verification across Auth0, CloudFront, API Gateway, Lambda,
+      and Neon (#22) - verified live in-browser this session: homepage, a real demo-forecast
+      API round-trip (CloudFront → API Gateway → Lambda → 200), both legal pages, and the
+      Auth0 hosted-login redirect. **Not verified**: an actual authenticated login and any
+      Neon-backed route (would require real credentials) - flagged for Ken to spot-check once.
+- [x] System / ops / API documentation pass, including deployment/runbook coverage (#23) -
+      new `docs/OPERATIONS.md` covers all of the above plus a deploy/rollback/incident-response
+      runbook; `infra/README.md`'s stale architecture diagram (showed a Route 53 box that was
+      never built) and inaccurate security claims (claimed Secrets Manager and least-privilege
+      IAM before this session's actual fixes) corrected to match reality.
 
 ## Legacy GitHub Project issue crosswalk
 
@@ -697,3 +732,29 @@ session (or a fresh Claude Code instance) orient in under a minute.
   Verified end-to-end in-browser: interstitial blocks every (app) route until accepted,
   acceptance persists across reload, footer/legal pages render correctly down to 375px.
   Next: Phase 5, or any newly-discovered polish item.
+- 2026-07-13: Phase 5 (production hardening) first pass, written up in full in the new
+  `docs/OPERATIONS.md`. Shipped: JSON structured logging + a per-request access-log middleware
+  (`backend/src/core/logging.py`); removed the Lambda role's unused, account-wide
+  `AmazonS3ReadOnlyAccess` IAM attachment (confirmed via grep - the app never calls S3 itself);
+  added a public-access-block to the frontend S3 bucket to match the backend bucket's existing
+  posture; cleaned up `main.tf`'s dead commented-out module stubs; fixed `infra/README.md`'s
+  stale architecture diagram (it showed a Route 53 box that was never actually built - DNS has
+  always been Hover) and inaccurate security claims (it claimed Secrets Manager and
+  least-privilege IAM before today's actual fixes). Decided and documented: keep DNS at Hover
+  (no Route 53 migration - pure added cost, no feature Tally needs at this scale), and keep the
+  Auth0 consent-timing tradeoff from Phase 4.7 as an accepted risk rather than customizing
+  Auth0's hosted login (still a dashboard-only, out-of-repo change with no local/CI
+  equivalent). Verified prod end-to-end in-browser: homepage, a real demo-forecast API
+  round-trip (CloudFront → API Gateway → Lambda → 200), both legal pages, and the Auth0 hosted
+  login redirect - did not complete an actual login (no test credentials used). Production
+  deployment audit reconciled every original bootstrap issue (#8-10, #12, #17, #18) against
+  current reality in a table in `docs/OPERATIONS.md` - all shipped, mostly via GitHub Actions
+  automation instead of the originally-scoped local scripts. **Blocked this session**: the
+  local AWS SSO token was expired and refreshing it needs an interactive browser login only Ken
+  can do, so anything requiring live AWS/Neon credentials was documented as a flagged follow-up
+  rather than guessed at - notably the CloudWatch log group retention fix (exact command
+  provided), confirming which Neon plan prod is on (determines the real PITR window), the
+  legal/compliance review of the Privacy Policy and Terms pages, and a live IAM policy review
+  of the GitHub Actions OIDC role. Next: whatever Ken decides on the flagged items above, or any
+  newly-discovered polish item - Phase 5 stays open/ongoing per its own header rather than ever
+  being "complete."

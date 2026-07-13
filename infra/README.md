@@ -6,15 +6,18 @@ This directory contains the Terraform infrastructure as code for deploying Tally
 
 ```mermaid
 graph TB
+    subgraph DNS["DNS (outside AWS)"]
+        Hover["Hover<br/>CNAME: tally.kenhoward.dev"]
+    end
+
     subgraph AWS["AWS Cloud"]
-        subgraph DNS["DNS & CDN Layer"]
-            R53["Route 53<br/>tally.kenhoward.dev"]
+        subgraph CDNLayer["CDN Layer"]
             CF["CloudFront Distribution<br/>(CDN + SSL/TLS)"]
             ACM["ACM Certificate<br/>(SSL/TLS)"]
         end
 
         subgraph Frontend["Frontend Layer"]
-            S3["S3 Bucket<br/>Static Website Hosting<br/>(Svelte App)"]
+            S3["S3 Bucket<br/>OAC-protected origin<br/>(Svelte App)"]
         end
 
         subgraph API["API Layer"]
@@ -28,15 +31,23 @@ graph TB
     User["User Browser"]
     Auth0["Auth0<br/>Authentication Service"]
 
-    User --> R53
+    User --> Hover
     User <--> Auth0
-    R53 --> CF
+    Hover --> CF
     CF --> S3
-    User --> APIGW
+    CF --> APIGW
     APIGW --> Lambda
     Lambda --> Auth0
     Lambda --> Neon
 ```
+
+DNS is deliberately kept at Hover rather than migrated to Route 53 - see
+[docs/OPERATIONS.md](../docs/OPERATIONS.md)'s "DNS / Domain Decision" section for the reasoning
+(no Route 53-specific feature is needed at this scale, and it's a pure added $0.50/month for no
+operational gain). The frontend is only reachable through CloudFront (an Origin Access Control,
+not the S3 website endpoint - the `aws_s3_bucket_website_configuration` resource in
+`modules/frontend_s3/` is unused dead weight from an earlier iteration, kept only because
+removing it isn't worth the risk of being wrong about it being truly unused).
 
 Connection strings and Auth0 values reach the Lambda as plain environment variables
 (`TF_VAR_database_url_readwrite`/`readonly`, `TF_VAR_auth0_domain`/`audience` — see
@@ -148,9 +159,9 @@ The infrastructure is organized into reusable modules:
 
 ### Module Status
 
-All modules above except `auth0` are implemented and wired up in `main.tf`. Two stub blocks
-remain commented out at the bottom of `main.tf` (a duplicate `acm` and an `auth0` module call)
-— safe to ignore or clean up, not part of the active configuration.
+All modules above except `auth0` are implemented and wired up in `main.tf`. (The dead
+commented-out duplicate `acm`/`auth0` module stubs previously here were removed in the Phase 5
+cleanup - `main.tf` now only contains active configuration.)
 
 ## Development Workflow
 
@@ -272,9 +283,17 @@ make check-aws
 ## Security Considerations
 
 - **Credentials**: Never commit `.aws-credentials` file (included in `.gitignore`)
-- **State Files**: Remote state is encrypted and access-controlled
-- **IAM**: Uses least-privilege access patterns
-- **Secrets**: Sensitive data stored in AWS Secrets Manager
+- **State Files**: Remote state is encrypted (`infra/backend.conf`'s `encrypt = true`) and
+  reachable only via the GitHub Actions OIDC role or Ken's own AWS SSO identity
+- **IAM**: the Lambda execution role carries only `AWSLambdaBasicExecutionRole` (CloudWatch
+  Logs write) - an unused, account-wide `AmazonS3ReadOnlyAccess` attachment was removed in the
+  Phase 5 security review (see `docs/OPERATIONS.md`)
+- **Secrets**: DB/Auth0 values reach the Lambda as plain environment variables, not AWS
+  Secrets Manager - a deliberate cost tradeoff (Secrets Manager is $0.40/secret/month plus API
+  calls), documented in `docs/OPERATIONS.md`'s security review, not an oversight
+
+See [docs/OPERATIONS.md](../docs/OPERATIONS.md) for the full Phase 5 security hardening
+review, cost review, and production deployment audit.
 
 ## Contributing
 

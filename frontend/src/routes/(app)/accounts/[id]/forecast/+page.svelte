@@ -35,6 +35,7 @@
 	let error = $state<string | null>(null);
 	let forecast = $state<ForecastResponse | null>(null);
 	let expanded = $state<Record<string, boolean>>({});
+	let reconciliationExpanded = $state<Record<string, boolean>>({});
 	let lastForecastRequest = $state<ForecastRequest | null>(null);
 
 	let startingBalance = $state('0');
@@ -69,6 +70,11 @@
 			const inNinetyDays = new Date();
 			inNinetyDays.setDate(inNinetyDays.getDate() + 90);
 
+			const hasSavedForecastSettings =
+				account.forecast_starting_balance_cents != null &&
+				account.forecast_start_date != null &&
+				account.forecast_end_date != null;
+
 			startingBalance =
 				account.forecast_starting_balance_cents != null
 					? (account.forecast_starting_balance_cents / 100).toString()
@@ -80,6 +86,10 @@
 			cycleType = account.forecast_cycle_type ?? 'biweekly';
 			startDate = account.forecast_start_date ?? today;
 			endDate = account.forecast_end_date ?? isoDate(inNinetyDays);
+
+			if (hasSavedForecastSettings) {
+				await calculate();
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -87,8 +97,7 @@
 		}
 	});
 
-	async function handleCalculate(event: SubmitEvent) {
-		event.preventDefault();
+	async function calculate() {
 		const startingBalanceCents = Math.round(Number(startingBalance) * 100);
 		const incomePerCycleCents = Math.round(Number(incomePerCycle) * 100);
 		if (
@@ -111,11 +120,17 @@
 			};
 			forecast = await computeForecast(accountId, lastForecastRequest);
 			expanded = {};
+			reconciliationExpanded = {};
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			calculating = false;
 		}
+	}
+
+	async function handleCalculate(event: SubmitEvent) {
+		event.preventDefault();
+		await calculate();
 	}
 
 	// Cycle overrides can shift a cycle's net_cents, which cascades into every
@@ -129,6 +144,13 @@
 
 	function toggleExpanded(cycleStart: string) {
 		expanded = { ...expanded, [cycleStart]: !expanded[cycleStart] };
+	}
+
+	function toggleReconciliation(cycleStart: string) {
+		reconciliationExpanded = {
+			...reconciliationExpanded,
+			[cycleStart]: !reconciliationExpanded[cycleStart]
+		};
 	}
 
 	function formatAmount(cents: number): string {
@@ -350,51 +372,59 @@
 					</tr>
 					{#if expanded[cycle.start_date]}
 						{#each cycle.bills as bill (`bill-${bill.bill_id}-${bill.due_date}`)}
-							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
-								<td class="px-4 py-2 pl-8 align-top">{bill.due_date}</td>
-								<td class="px-4 py-2 align-top {bill.completed ? 'text-slate-400 line-through' : ''}">
-									{bill.name}
-								</td>
-								<td class="px-4 py-2 text-right align-top">
-									{#if active}
-										<div class="flex flex-col items-end gap-1">
-											<span class={bill.completed ? 'text-slate-400 line-through' : ''}>
-												{formatAmount(bill.amount_cents)}
-											</span>
-											<label class="flex items-center gap-1 text-xs text-slate-500">
+							{#if active}
+								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+									<td class="px-4 py-2 pl-8" colspan="3">
+										<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+											<label class="flex items-center gap-2">
 												<input
 													type="checkbox"
 													checked={bill.completed}
 													onchange={() => toggleBillCompleted(cycle, bill)}
+													aria-label="Paid"
 												/>
-												Paid
+												<span class="w-16 shrink-0 text-xs text-slate-400">{bill.due_date}</span>
+												<span class={bill.completed ? 'text-slate-400 line-through' : 'text-text'}>
+													{bill.name}
+												</span>
 											</label>
-											<input
-												type="number"
-												step="0.01"
-												placeholder={(bill.forecasted_amount_cents / 100).toString()}
-												value={currentOverrideAmount(bill) !== null
-													? (bill.amount_cents / 100).toString()
-													: ''}
-												onchange={(event) => commitBillAmount(cycle, bill, event)}
-												class="w-24 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-											/>
-											<input
-												type="text"
-												placeholder="Note"
-												value={bill.notes ?? ''}
-												onchange={(event) => commitBillNotes(cycle, bill, event)}
-												class="w-32 rounded-card border border-slate-300 px-2 py-1 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-											/>
+											<div class="ml-auto flex items-center gap-2">
+												<span class="text-xs text-slate-400">$</span>
+												<input
+													type="number"
+													step="0.01"
+													placeholder={(bill.forecasted_amount_cents / 100).toString()}
+													value={currentOverrideAmount(bill) !== null
+														? (bill.amount_cents / 100).toString()
+														: ''}
+													onchange={(event) => commitBillAmount(cycle, bill, event)}
+													class="w-20 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+												/>
+												<input
+													type="text"
+													placeholder="Note"
+													value={bill.notes ?? ''}
+													onchange={(event) => commitBillNotes(cycle, bill, event)}
+													class="w-28 rounded-card border border-slate-300 px-2 py-1 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+												/>
+											</div>
 										</div>
-									{:else}
+									</td>
+								</tr>
+							{:else}
+								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+									<td class="px-4 py-2 pl-8 align-top">{bill.due_date}</td>
+									<td class="px-4 py-2 align-top {bill.completed ? 'text-slate-400 line-through' : ''}">
+										{bill.name}
+									</td>
+									<td class="px-4 py-2 text-right align-top">
 										{formatAmount(bill.amount_cents)}
 										{#if bill.notes}
 											<p class="text-xs text-slate-400">{bill.notes}</p>
 										{/if}
-									{/if}
-								</td>
-							</tr>
+									</td>
+								</tr>
+							{/if}
 						{/each}
 						{#each cycle.transactions as transaction (`transaction-${transaction.transaction_id}`)}
 							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
@@ -410,71 +440,83 @@
 							</tr>
 						{/each}
 						{#each cycle.windfalls as windfall (`windfall-${windfall.windfall_id}`)}
-							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
-								<td class="px-4 py-2 pl-8 align-top">{windfall.expected_date}</td>
-								<td
-									class="px-4 py-2 align-top {windfall.completed ? 'text-slate-400 line-through' : ''}"
-								>
-									<span
-										class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
-									>
-										Windfall
-									</span>
-									{windfall.name}
-								</td>
-								<td class="px-4 py-2 text-right align-top">
-									{#if active}
-										<div class="flex flex-col items-end gap-1">
-											<span
-												class={windfall.completed
-													? 'text-slate-400 line-through'
-													: 'text-emerald-700'}
-											>
-												{formatAmount(windfall.amount_cents)}
-											</span>
-											<label class="flex items-center gap-1 text-xs text-slate-500">
+							{#if active}
+								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+									<td class="px-4 py-2 pl-8" colspan="3">
+										<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+											<label class="flex items-center gap-2">
 												<input
 													type="checkbox"
 													checked={windfall.completed}
 													onchange={() => toggleWindfallCompleted(cycle, windfall)}
+													aria-label="Received"
 												/>
-												Received
+												<span class="w-16 shrink-0 text-xs text-slate-400">{windfall.expected_date}</span>
+												<span
+													class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+												>
+													Windfall
+												</span>
+												<span
+													class={windfall.completed ? 'text-slate-400 line-through' : 'text-text'}
+												>
+													{windfall.name}
+												</span>
 											</label>
-											<input
-												type="number"
-												step="0.01"
-												placeholder={(windfall.forecasted_amount_cents / 100).toString()}
-												value={currentOverrideAmount(windfall) !== null
-													? (windfall.amount_cents / 100).toString()
-													: ''}
-												onchange={(event) => commitWindfallAmount(cycle, windfall, event)}
-												class="w-24 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-											/>
-											<input
-												type="text"
-												placeholder="Note"
-												value={windfall.notes ?? ''}
-												onchange={(event) => commitWindfallNotes(cycle, windfall, event)}
-												class="w-32 rounded-card border border-slate-300 px-2 py-1 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-											/>
+											<div class="ml-auto flex items-center gap-2">
+												<span class="text-xs text-slate-400">$</span>
+												<input
+													type="number"
+													step="0.01"
+													placeholder={(windfall.forecasted_amount_cents / 100).toString()}
+													value={currentOverrideAmount(windfall) !== null
+														? (windfall.amount_cents / 100).toString()
+														: ''}
+													onchange={(event) => commitWindfallAmount(cycle, windfall, event)}
+													class="w-20 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+												/>
+												<input
+													type="text"
+													placeholder="Note"
+													value={windfall.notes ?? ''}
+													onchange={(event) => commitWindfallNotes(cycle, windfall, event)}
+													class="w-28 rounded-card border border-slate-300 px-2 py-1 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+												/>
+											</div>
 										</div>
-									{:else}
+									</td>
+								</tr>
+							{:else}
+								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+									<td class="px-4 py-2 pl-8 align-top">{windfall.expected_date}</td>
+									<td class="px-4 py-2 align-top {windfall.completed ? 'text-slate-400 line-through' : ''}">
+										<span
+											class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+										>
+											Windfall
+										</span>
+										{windfall.name}
+									</td>
+									<td class="px-4 py-2 text-right align-top">
 										<span class="text-emerald-700">{formatAmount(windfall.amount_cents)}</span>
 										{#if windfall.notes}
 											<p class="text-xs text-slate-400">{windfall.notes}</p>
 										{/if}
-									{/if}
-								</td>
-							</tr>
+									</td>
+								</tr>
+							{/if}
 						{/each}
 						{#if active}
 							{@const summary = reconciliation(cycle)}
-							<tr class="border-b border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 last:border-0">
-								<td class="px-4 py-2 pl-8" colspan="2">Reconciliation - forecasted vs. actual</td>
-								<td class="px-4 py-2 text-right">
-									<div class="flex flex-col items-end gap-0.5">
-										<span>Forecasted: {formatAmount(summary.forecastedNetCents)}</span>
-										<span>Actual: {formatAmount(summary.actualNetCents)}</span>
+							<tr class="border-b border-slate-200 bg-slate-50 text-sm text-slate-700 last:border-0">
+								<td class="p-0" colspan="3">
+									<button
+										type="button"
+										class="flex w-full items-center justify-between px-4 py-2 pl-8 text-left font-medium"
+										onclick={() => toggleReconciliation(cycle.start_date)}
+										aria-expanded={!!reconciliationExpanded[cycle.start_date]}
+									>
+										<span>Reconciliation - forecasted vs. actual</span>
 										<span
 											class={summary.varianceCents === 0
 												? 'text-slate-500'
@@ -484,7 +526,13 @@
 										>
 											Variance: {formatAmount(summary.varianceCents)}
 										</span>
-									</div>
+									</button>
+									{#if reconciliationExpanded[cycle.start_date]}
+										<div class="flex justify-end gap-4 px-4 pb-2 pl-8 text-xs text-slate-500">
+											<span>Forecasted: {formatAmount(summary.forecastedNetCents)}</span>
+											<span>Actual: {formatAmount(summary.actualNetCents)}</span>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/if}

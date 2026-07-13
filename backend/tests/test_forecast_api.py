@@ -163,6 +163,96 @@ async def test_forecast_scoped_to_account_owner(client: AsyncClient):
     assert res.status_code == 404
 
 
+async def test_forecast_applies_bill_override_amount_and_completed(client: AsyncClient):
+    account = await _create_account(client)
+    bill = (
+        await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    ).json()
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2024-01-01",
+            "completed": True,
+            "override_amount_cents": 160000,
+            "notes": "rent went up",
+        },
+    )
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/forecast",
+        json=_forecast_payload(end_date="2024-01-31"),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    line = body["cycles"][0]["bills"][0]
+    assert line["amount_cents"] == 160000
+    assert line["forecasted_amount_cents"] == 150000
+    assert line["completed"] is True
+    assert line["notes"] == "rent went up"
+    # 100000 + 200000 - 160000 (overridden amount, not the base 150000)
+    assert body["cycles"][0]["running_balance_cents"] == 100000 + 200000 - 160000
+
+
+async def test_forecast_applies_windfall_override(client: AsyncClient):
+    account = await _create_account(client)
+    windfall = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/windfalls",
+            json={"name": "bonus", "amount_cents": 50000, "expected_date": "2024-01-20"},
+        )
+    ).json()
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "windfall_id": windfall["id"],
+            "cycle_start_date": "2024-01-01",
+            "completed": True,
+            "override_amount_cents": 45000,
+        },
+    )
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/forecast",
+        json=_forecast_payload(end_date="2024-01-31"),
+    )
+    assert res.status_code == 200
+    line = res.json()["cycles"][0]["windfalls"][0]
+    assert line["amount_cents"] == 45000
+    assert line["forecasted_amount_cents"] == 50000
+    assert line["completed"] is True
+
+
+async def test_forecast_override_for_different_cycle_does_not_apply(client: AsyncClient):
+    account = await _create_account(client)
+    bill = (
+        await client.post(f"/api/v1/accounts/{account['id']}/bills", json=_bill_payload())
+    ).json()
+    # Override targets a February cycle, not the January cycle the bill
+    # actually falls in this forecast window - should have no effect.
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2024-02-01",
+            "completed": True,
+            "override_amount_cents": 999999,
+        },
+    )
+
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/forecast",
+        json=_forecast_payload(end_date="2024-01-31"),
+    )
+    assert res.status_code == 200
+    line = res.json()["cycles"][0]["bills"][0]
+    assert line["amount_cents"] == 150000
+    assert line["completed"] is False
+
+
 async def test_forecast_end_date_before_start_date_is_rejected(client: AsyncClient):
     account = await _create_account(client)
 

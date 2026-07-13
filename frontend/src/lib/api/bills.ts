@@ -1,5 +1,5 @@
 import { apiFetch, apiJson, ApiError } from '$lib/api';
-import type { Bill, BillInput } from '$lib/api/types';
+import type { Bill, BillHistoryResponse, BillInput } from '$lib/api/types';
 
 export function listBills(accountId: number): Promise<Bill[]> {
 	return apiJson(`/api/v1/accounts/${accountId}/bills`);
@@ -25,6 +25,18 @@ export function updateBill(
 
 export function deleteBill(accountId: number, billId: number): Promise<void> {
 	return apiJson(`/api/v1/accounts/${accountId}/bills/${billId}`, { method: 'DELETE' });
+}
+
+export function getBillHistory(
+	accountId: number,
+	billId: number,
+	params: { limit?: number; offset?: number } = {}
+): Promise<BillHistoryResponse> {
+	const query = new URLSearchParams();
+	if (params.limit != null) query.set('limit', String(params.limit));
+	if (params.offset != null) query.set('offset', String(params.offset));
+	const qs = query.toString();
+	return apiJson(`/api/v1/accounts/${accountId}/bills/${billId}/history${qs ? `?${qs}` : ''}`);
 }
 
 export async function exportBillsCsv(accountId: number): Promise<Blob> {

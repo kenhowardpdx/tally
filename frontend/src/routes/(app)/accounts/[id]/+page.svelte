@@ -354,7 +354,13 @@
 							</button>
 						</td>
 						<td class="px-4 py-2 text-right">
-							<div class="flex justify-end gap-2">
+							<div class="flex items-center justify-end gap-2">
+								<a
+									class="text-sm text-primary underline"
+									href="/accounts/{accountId}/bills/{bill.id}/history"
+								>
+									History
+								</a>
 								<Button variant="secondary" onclick={() => openEditModal(bill)}>Edit</Button>
 								<Button variant="secondary" onclick={() => openMoveModal(bill)}>Move</Button>
 								<Button variant="danger" onclick={() => handleDelete(bill.id)}>Delete</Button>

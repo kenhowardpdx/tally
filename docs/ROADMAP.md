@@ -321,40 +321,55 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       (`frontend/src/lib/components/AccountNav.svelte`) across all four per-account pages
       (Bills/Transactions/Windfalls/Forecast) — the old one-off "← Accounts"/"Forecast →"
       links didn't scale past two sibling pages.
-- [ ] 3.5 Data model + migration: `cycle_overrides` table — one row per
-      (account, bill-or-windfall, cycle_start_date), with a `completed` bool and a
-      nullable `override_amount_cents`, plus optional `notes` text. Upsert semantics (create on first write, update
-      on subsequent writes for the same key). DB uniqueness via constraints/indexes on
-      `(account_id, bill_id, cycle_start_date)` and `(account_id, windfall_id, cycle_start_date)`
-      prevents accidental duplicates.
-- [ ] 3.6 Backend: `cycle_overrides` CRUD endpoints — `PUT /api/v1/cycle-overrides`
-      (upsert by composite key), `GET /api/v1/accounts/{id}/cycle-overrides?cycle_start={date}`
-      (all overrides for a given cycle). Scope to `get_owned_bank_account` as usual. Validate
-      that exactly one of `bill_id`/`windfall_id` is set, and that the referenced entity belongs
-      to the given account.
-- [ ] 3.7 Backend: Incorporate `cycle_overrides` into the forecast response. For any bill or
-      windfall that has an override for the cycle's `start_date`: (a) substitute
-      `override_amount_cents` for the base amount in the running balance if set; (b) annotate the
-      line item with `completed: true/false`; (c) return `notes` so the frontend can render cycle
-      context inline. The forecast endpoint should accept (or derive) the relevant
-      `cycle_start_date` values and fetch matching overrides in a single query rather than per-item.
-- [ ] 3.8 Frontend: Active-cycle interactive controls in the forecast view. The active cycle is
-      the cycle whose `start_date ≤ today < end_date`. In the expanded bill/windfall list for
-      that cycle only, render: a checkbox labeled "Paid" / "Received" (maps to `completed`) and
-      an optional actual-amount field (maps to `override_amount_cents`), and an optional note field
-      (maps to `notes`). All persist via the 3.6 upsert endpoint on change. Completed items render
-      with a strikethrough or muted style. Non-active cycles remain read-only.
-- [ ] 3.9 Frontend: Reconciliation summary row at the bottom of the active cycle. Shows
-      forecasted total vs. sum-of-actuals (using override amounts where set, base amounts where
-      not), and the variance. Helps the user confirm their real bank balance matches the
-      simulated running total before the cycle closes.
-- [ ] 3.10 Backend: bill-history endpoint/query for a single bill, returning cycle-by-cycle
-      entries (cycle window, expected amount, actual overridden amount if present, completion
-      status, override notes, and variance). Include pagination/date-range filters so large
-      histories remain performant.
-- [ ] 3.11 Frontend: bill history view accessible from the bills page and/or forecast line
-      items. Render a chronological table/timeline showing each cycle’s expected vs actual
-      amount, paid state, notes, and variance so users can spot drift patterns over time.
+- [x] 3.5 Data model + migration: `cycle_overrides` table (`backend/src/models/cycle_override.py`,
+      migration `f7442af7b00b`) — one row per (account, bill-or-windfall, cycle_start_date), with a
+      `completed` bool and a nullable `override_amount_cents`, plus optional `notes` text. DB
+      uniqueness via `(account_id, bill_id, cycle_start_date)` and
+      `(account_id, windfall_id, cycle_start_date)` unique constraints, plus a CHECK constraint that
+      exactly one of `bill_id`/`windfall_id` is set (Postgres unique constraints treat NULLs as
+      distinct, so only the non-null side of each row is actually constrained — the CHECK is what
+      enforces "exactly one").
+- [x] 3.6 Backend: `cycle_overrides` CRUD endpoints (`backend/src/api/cycle_overrides.py`) —
+      `PUT /api/v1/cycle-overrides` (upsert by composite key, account resolved from the request body
+      rather than a path param since there's no account-scoped prefix), `GET
+      /api/v1/accounts/{id}/cycle-overrides?cycle_start={date}` (all overrides for a given cycle).
+      Validates exactly one of `bill_id`/`windfall_id` is set (Pydantic model validator, mirroring the
+      DB CHECK) and that the referenced entity belongs to the given account.
+- [x] 3.7 Backend: Incorporated `cycle_overrides` into the forecast response
+      (`backend/src/forecast/cycle.py`, `engine.py`) — for any bill or windfall with an override for
+      the cycle's `start_date`: substitutes `override_amount_cents` into the running balance if set,
+      annotates the line with `completed`/`notes`. Overrides are fetched in one query per forecast
+      request and grouped by `cycle_start_date` before being handed to `build_cycle()` per cycle. A
+      bill recurring more than once within a single cycle (e.g. weekly inside a monthly forecast)
+      only applies its override to the first occurrence, matching the "one row per cycle" data model.
+- [x] 3.8 Frontend: Active-cycle interactive controls in the forecast view
+      (`frontend/src/routes/(app)/accounts/[id]/forecast/+page.svelte`). The active cycle
+      (`start_date ≤ today < end_date`) renders a "Paid"/"Received" checkbox, an actual-amount field,
+      and a note field per bill/windfall line, persisting via the 3.6 upsert endpoint on change.
+      Every change re-runs the same forecast request (rather than patching cached cycles
+      client-side) since an override can cascade into every later cycle's running balance and only
+      the real engine computes that correctly. Completed items render muted/strikethrough; non-active
+      cycles stay read-only display-only.
+- [x] 3.9 Frontend: Reconciliation summary row at the bottom of the active cycle's expanded line
+      items — forecasted total (bills'/windfalls' base amounts) vs. actual (the backend's
+      override-substituted `net_cents`) vs. variance. Computed client-side from fields the forecast
+      response already returns, no backend changes needed.
+- [x] 3.10 Backend: bill-history endpoint (`GET .../bills/{bill_id}/history`, in
+      `backend/src/api/bills.py`) returning cycle-by-cycle entries (cycle window, expected amount,
+      actual overridden amount, completion, notes, variance), with `limit`/`offset` pagination and
+      `start_date`/`end_date`/`cycle_type` filters. Reuses the forecast engine's cycle-boundary logic
+      (promoted `_iter_cycle_bounds` to public `iter_cycle_bounds`, new
+      `backend/src/forecast/bill_history.py`) so a cycle_overrides row lines up with the same cycle
+      windows `/forecast` computes. Defaults to the account's persisted `forecast_start_date`/
+      `forecast_cycle_type` (not the bill's own `start_date`) as the cycle anchor — overrides are
+      keyed against whatever anchor `/forecast` actually used, so anchoring on the bill's own
+      `start_date` instead would silently miss real overrides whenever the two dates disagree
+      (caught via manual browser verification, not by the initial test suite — see session log).
+- [x] 3.11 Frontend: bill history view
+      (`frontend/src/routes/(app)/accounts/[id]/bills/[billId]/history/+page.svelte`, linked from a
+      "History" action on the bills table). Renders a chronological table of each cycle's due date,
+      cycle window, expected/actual amount, variance, paid state, and notes, with a simple
+      offset-based "Load more" button rather than a full date-range picker UI.
 
 
 ## Phase 4 — Multi-account dashboard & polish
@@ -534,3 +549,20 @@ session (or a fresh Claude Code instance) orient in under a minute.
   3 cycle reconciliation (3.5-3.11 - `cycle_overrides` data model/migration, CRUD, forecast
   engine integration, active-cycle frontend controls, reconciliation summary, bill
   history), or any Phase 4 item.
+- 2026-07-12: Phase 3 cycle reconciliation shipped end-to-end (3.5-3.11) - `cycle_overrides`
+  table + migration, upsert/list CRUD endpoints, forecast engine integration (overrides
+  grouped by `cycle_start_date`, substituted into the running balance, first-occurrence-only
+  for bills that recur more than once in a cycle), active-cycle Paid/Received + actual-amount
+  + notes controls on the forecast page (each change re-runs the real forecast rather than
+  patching cached balances client-side, since an override cascades into every later cycle),
+  a reconciliation summary row, and a bill-history endpoint/view. Bill-history reuses the
+  forecast engine's cycle-boundary logic (promoted `_iter_cycle_bounds` to public
+  `iter_cycle_bounds`) rather than re-deriving it. Manual browser verification (not caught by
+  the initial test suite) found a real bug: bill-history defaulted its cycle anchor to the
+  bill's own `start_date` instead of the account's persisted `forecast_start_date`, so a real
+  override could silently never appear in history whenever the two dates disagreed - fixed
+  and covered with a regression test. Also fixed pre-existing, unrelated drift blocking every
+  commit's pre-commit hook (`claude.yml`'s `actions/checkout@v6` vs. the `v5` approved
+  elsewhere, from PR #94). Next: Phase 4 (multi-account dashboard & polish), or any
+  previously-logged follow-up (1.7 recurrence-config UI still open; 4.1/4.5/4.6 follow-ups
+  from earlier sessions).

@@ -18,6 +18,14 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Null until the user accepts the Privacy Policy/Terms via the frontend's
+    # consent interstitial ((app)/+layout.svelte) - tracked here rather than
+    # in Auth0 because the tenant/Universal Login page isn't managed by this
+    # codebase (it's a manual console step - see docs/ROADMAP.md's Phase 0
+    # notes), so there's no infra-as-code hook to add a signup-time checkbox
+    # there consistently across environments. See docs/ROADMAP.md's
+    # consent-tracking note for the full tradeoff.
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     bank_accounts: Mapped[list["BankAccount"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

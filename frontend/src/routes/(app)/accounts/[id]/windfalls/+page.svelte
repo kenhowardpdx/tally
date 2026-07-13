@@ -9,7 +9,11 @@
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Table from '$lib/components/Table.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { glossaryTerms } from '$lib/glossary';
 	import { onMount } from 'svelte';
+
+	const windfallTooltip = glossaryTerms.find((t) => t.term === 'Windfall')!.definition;
 
 	const accountId = $derived(Number($page.params.id));
 
@@ -84,9 +88,9 @@
 </script>
 
 <AccountNav {accountId} current="windfalls" />
-<h1 class="mt-2 text-2xl font-semibold text-text">
-	Windfalls{#if account}
-		({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+<h1 class="mt-2 flex items-center text-2xl font-semibold text-text">
+	Windfalls{#if account}{' '}({account.name}{#if account.institution}{' '}- {account.institution}{/if}){/if}
+	<Tooltip text={windfallTooltip} />
 </h1>
 
 {#if error}

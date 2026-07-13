@@ -35,7 +35,9 @@ from src.forecast import (
     ForecastWindfall,
     MissingRecurrenceConfig,
     build_cycle,
+    find_current_cycle_bounds,
     get_forecast,
+    iter_cycle_bounds,
     last_cycle_end,
 )
 from src.forecast.bill import occurrences_in_range, validate_recurrence_config
@@ -353,3 +355,80 @@ class TestGetForecastTransactionsAndWindfalls:
         assert result.cycles[0].transactions == []
         assert result.cycles[0].windfalls == []
         assert result.cycles[0].net_cents == 0
+
+
+class TestFindCurrentCycleBounds:
+    """find_current_cycle_bounds powers the dashboard's "current cycle"
+    snapshot card - given an account's saved anchor and today's date, it
+    should agree exactly with whatever get_forecast()/iter_cycle_bounds()
+    would generate for that same (cycle_type, anchor) pair.
+    """
+
+    def test_weekly_today_equals_anchor(self):
+        start, end = find_current_cycle_bounds(CycleType.WEEKLY, date(2024, 1, 1), date(2024, 1, 1))
+        assert (start, end) == (date(2024, 1, 1), date(2024, 1, 7))
+
+    def test_weekly_today_mid_cycle_well_after_anchor(self):
+        # Anchor is a Monday; ~10 weeks later, today falls mid-cycle.
+        start, end = find_current_cycle_bounds(CycleType.WEEKLY, date(2024, 1, 1), date(2024, 3, 14))
+        assert start <= date(2024, 3, 14) <= end
+        assert (end - start).days == 6
+        assert (start - date(2024, 1, 1)).days % 7 == 0
+
+    def test_biweekly_today_before_anchor_steps_backward(self):
+        # today is before the anchor (e.g. the account's forecast_start_date
+        # was set in the future relative to when this runs) - still finds a
+        # consistent, non-overlapping cycle containing today.
+        start, end = find_current_cycle_bounds(
+            CycleType.BIWEEKLY, date(2024, 6, 1), date(2024, 5, 3)
+        )
+        assert start <= date(2024, 5, 3) <= end
+        assert (end - start).days == 13
+        assert (date(2024, 6, 1) - start).days % 14 == 0
+
+    def test_monthly_several_years_after_anchor(self):
+        start, end = find_current_cycle_bounds(
+            CycleType.MONTHLY, date(2020, 1, 15), date(2024, 3, 20)
+        )
+        assert start == date(2024, 3, 15)
+        assert end == date(2024, 4, 14)
+
+    def test_monthly_anchored_on_31st_clamps_through_february(self):
+        start, end = find_current_cycle_bounds(
+            CycleType.MONTHLY, date(2024, 1, 31), date(2024, 2, 20)
+        )
+        assert start <= date(2024, 2, 20) <= end
+
+    def test_semimonthly_ignores_anchor_and_uses_fixed_boundaries(self):
+        # Semimonthly self-anchors to the 10th/25th regardless of where the
+        # account's own forecast_start_date sits.
+        start, end = find_current_cycle_bounds(
+            CycleType.SEMIMONTHLY, date(2019, 6, 3), date(2024, 3, 15)
+        )
+        assert (start, end) == (date(2024, 3, 10), date(2024, 3, 24))
+
+    def test_semimonthly_early_month_bucket_starts_on_prior_months_25th(self):
+        start, end = find_current_cycle_bounds(
+            CycleType.SEMIMONTHLY, date(2019, 6, 3), date(2024, 3, 5)
+        )
+        assert (start, end) == (date(2024, 2, 25), date(2024, 3, 9))
+
+    def test_semimonthly_late_month_bucket(self):
+        start, end = find_current_cycle_bounds(
+            CycleType.SEMIMONTHLY, date(2019, 6, 3), date(2024, 3, 28)
+        )
+        assert (start, end) == (date(2024, 3, 25), date(2024, 4, 9))
+
+    @pytest.mark.parametrize("cycle_type", [CycleType.WEEKLY, CycleType.BIWEEKLY, CycleType.MONTHLY])
+    def test_agrees_with_iter_cycle_bounds(self, cycle_type):
+        anchor = date(2023, 2, 1)
+        today = date(2024, 7, 18)
+        found_start, found_end = find_current_cycle_bounds(cycle_type, anchor, today)
+
+        # The last cycle iter_cycle_bounds() yields up through `today` should
+        # be exactly the one find_current_cycle_bounds() reports.
+        matching = None
+        for cycle_start, cycle_end in iter_cycle_bounds(cycle_type, anchor, today):
+            if cycle_start <= today <= cycle_end:
+                matching = (cycle_start, cycle_end)
+        assert matching == (found_start, found_end)

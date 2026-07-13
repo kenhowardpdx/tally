@@ -129,6 +129,80 @@ def last_cycle_end(cycle_type: CycleType, start_date: date, end_date: date) -> d
     return last_end
 
 
+def _shift_cycle_start(cycle_type: CycleType, start: date, periods: int) -> date:
+    """Moves `start` forward (positive `periods`) or backward (negative) by
+    whole cycle periods. Only meaningful for the self-anchoring-free types
+    (weekly/biweekly/monthly) - semimonthly's boundaries don't shift by a
+    fixed period (see _cycle_bounds's SEMIMONTHLY branch), so callers handle
+    it separately.
+    """
+    if cycle_type == CycleType.WEEKLY:
+        return start + timedelta(days=7 * periods)
+    if cycle_type == CycleType.BIWEEKLY:
+        return start + timedelta(days=14 * periods)
+    if cycle_type == CycleType.MONTHLY:
+        return _add_months(start, periods)
+    raise ValueError(f"Unsupported cycle type: {cycle_type}")  # pragma: no cover
+
+
+def find_current_cycle_bounds(
+    cycle_type: CycleType, anchor_start_date: date, today: date
+) -> tuple[date, date]:
+    """Finds the (start, end) of whichever cycle contains `today`, for a
+    sequence of cycles anchored at `anchor_start_date` (an account's saved
+    `forecast_start_date`).
+
+    Weekly/biweekly/monthly cycles only snap to whatever start date a caller
+    gives them (unlike semimonthly's fixed 10th/25th boundaries), so "the
+    cycle containing today" has to be derived by walking from the anchor
+    rather than computed from today alone. Semimonthly ignores the anchor
+    entirely and walks from the 1st of today's month instead, since its
+    boundaries are fixed regardless of where any particular forecast run
+    started.
+    """
+    if cycle_type == CycleType.SEMIMONTHLY:
+        # Exact, not an estimate: a steady-state semimonthly cycle only ever
+        # starts on the 10th or 25th (see _cycle_bounds - next_start is
+        # always one of those two), so today's day alone determines which
+        # bucket - and its start - today falls in.
+        if today.day <= 9:
+            prev_month = _add_months(date(today.year, today.month, 1), -1)
+            candidate = date(prev_month.year, prev_month.month, 25)
+        elif today.day <= 24:
+            candidate = date(today.year, today.month, 10)
+        else:
+            candidate = date(today.year, today.month, 25)
+    else:
+        # Closed-form estimate of how many whole periods separate the anchor
+        # from today, to avoid iterating one cycle at a time when the anchor
+        # is far in the past/future. Exact for weekly/biweekly; monthly's
+        # variable month lengths make this an estimate, not exact - the
+        # correction loop below fixes any off-by-one.
+        if cycle_type == CycleType.WEEKLY:
+            periods = (today - anchor_start_date).days // 7
+        elif cycle_type == CycleType.BIWEEKLY:
+            periods = (today - anchor_start_date).days // 14
+        elif cycle_type == CycleType.MONTHLY:
+            periods = (today.year - anchor_start_date.year) * 12 + (
+                today.month - anchor_start_date.month
+            )
+            if today.day < anchor_start_date.day:
+                periods -= 1
+        else:  # pragma: no cover - exhaustive over CycleType
+            raise ValueError(f"Unsupported cycle type: {cycle_type}")
+        candidate = _shift_cycle_start(cycle_type, anchor_start_date, periods)
+
+    # Semimonthly's candidate (the 1st of today's month) is always <= today
+    # by construction, so this only ever runs for the anchored types.
+    while candidate > today:
+        candidate = _shift_cycle_start(cycle_type, candidate, -1)
+    while True:
+        end, next_start = _cycle_bounds(cycle_type, candidate)
+        if today <= end:
+            return candidate, end
+        candidate = next_start
+
+
 def get_forecast(
     bills: list[ForecastBill],
     cycle_type: CycleType,

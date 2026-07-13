@@ -1,14 +1,18 @@
 <script lang="ts">
+	import Tooltip from '$lib/components/Tooltip.svelte';
+
 	let {
 		label,
 		value = $bindable(''),
 		id,
-		options
+		options,
+		tooltip
 	}: {
 		label?: string;
 		value?: string;
 		id?: string;
 		options: { value: string; label: string }[];
+		tooltip?: string;
 	} = $props();
 
 	const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
@@ -16,6 +20,11 @@
 	let open = $state(false);
 	let containerEl = $state<HTMLDivElement | undefined>();
 	let optionEls: (HTMLButtonElement | undefined)[] = [];
+	// Same reasoning as DatePicker's alignRight: min-w-max lets the popover
+	// grow wider than the trigger for long option labels (e.g. "Semimonthly
+	// (10th & 25th)"), which overflows the viewport on narrow screens when
+	// the trigger sits right of center.
+	let alignRight = $state(false);
 
 	const selectedLabel = $derived(options.find((o) => o.value === value)?.label ?? '');
 
@@ -29,6 +38,9 @@
 	}
 
 	function openAndFocusSelected() {
+		if (containerEl) {
+			alignRight = containerEl.getBoundingClientRect().left > window.innerWidth / 2;
+		}
 		open = true;
 		const selectedIndex = options.findIndex((o) => o.value === value);
 		// Wait for the {#if open} popover to mount before focusing into it.
@@ -72,7 +84,12 @@
 
 <div class="relative flex flex-col gap-1" bind:this={containerEl}>
 	{#if label}
-		<label for={selectId} class="text-sm font-medium text-text">{label}</label>
+		<label for={selectId} class="flex items-center text-sm font-medium text-text">
+			{label}
+			{#if tooltip}
+				<Tooltip text={tooltip} />
+			{/if}
+		</label>
 	{/if}
 	<button
 		type="button"
@@ -88,7 +105,9 @@
 
 	{#if open}
 		<div
-			class="absolute top-full z-10 mt-1 w-full min-w-max rounded-card border border-slate-200 bg-surface py-1 shadow-card"
+			class="absolute top-full z-10 mt-1 w-full min-w-max max-w-[calc(100vw-2rem)] rounded-card border border-slate-200 bg-surface py-1 shadow-card {alignRight
+				? 'right-0'
+				: 'left-0'}"
 			role="listbox"
 		>
 			{#each options as option, i (option.value)}

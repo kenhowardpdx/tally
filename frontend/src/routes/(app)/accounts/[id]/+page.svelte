@@ -22,8 +22,11 @@
 	import RecurrenceConfigFields from '$lib/components/RecurrenceConfigFields.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
+	import { glossaryTerms } from '$lib/glossary';
 	import { recurrenceLabels } from '$lib/recurrence';
 	import { onMount } from 'svelte';
+
+	const frequencyTooltip = glossaryTerms.find((t) => t.term === 'Frequency')!.definition;
 
 	const accountId = $derived(Number($page.params.id));
 
@@ -274,7 +277,7 @@
 <AccountNav {accountId} current="bills" />
 <div class="mt-2 flex items-center justify-between">
 	<h1 class="text-2xl font-semibold text-text">
-		Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+		Bills{#if account}{' '}({account.name}{#if account.institution}{' '}- {account.institution}{/if}){/if}
 	</h1>
 	<div class="flex gap-2">
 		<input
@@ -316,6 +319,7 @@
 			label="Frequency"
 			bind:value={recurrenceType}
 			options={recurrenceOptions.map((option) => ({ value: option, label: recurrenceLabels[option] }))}
+			tooltip={frequencyTooltip}
 		/>
 		{#key recurrenceFieldsResetKey}
 			<RecurrenceConfigFields {recurrenceType} bind:recurrenceConfig />
@@ -405,6 +409,7 @@
 				label="Frequency"
 				bind:value={editRecurrenceType}
 				options={recurrenceOptions.map((option) => ({ value: option, label: recurrenceLabels[option] }))}
+				tooltip={frequencyTooltip}
 			/>
 			<RecurrenceConfigFields
 				recurrenceType={editRecurrenceType}

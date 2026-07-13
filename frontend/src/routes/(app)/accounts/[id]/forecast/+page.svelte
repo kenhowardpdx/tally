@@ -20,7 +20,10 @@
 	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
 	import { cycleTypeLabels } from '$lib/cycle';
+	import { glossaryTerms } from '$lib/glossary';
 	import { onMount } from 'svelte';
+
+	const cycleTooltip = glossaryTerms.find((t) => t.term === 'Cycle type')!.definition;
 
 	const accountId = $derived(Number($page.params.id));
 
@@ -256,12 +259,15 @@
 
 <AccountNav {accountId} current="forecast" />
 <h1 class="mt-2 text-2xl font-semibold text-text">
-	Forecast{#if account}
-		({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+	Forecast{#if account}{' '}({account.name}{#if account.institution}{' '}- {account.institution}{/if}){/if}
 </h1>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
+{/if}
+
+{#if loading}
+	<p class="mt-4 text-sm text-slate-500">Loading account...</p>
 {/if}
 
 <Card>
@@ -286,6 +292,7 @@
 			label="Cycle"
 			bind:value={cycleType}
 			options={cycleTypeOptions.map((option) => ({ value: option, label: cycleTypeLabels[option] }))}
+			tooltip={cycleTooltip}
 		/>
 		<Button type="submit" disabled={calculating || loading}>Calculate</Button>
 	</form>

@@ -2,16 +2,18 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
+from src.bill_events import TRACKED_BILL_FIELDS, created_event, update_events
 from src.bills_csv import bills_to_csv, parse_csv_rows
 from src.core.database import get_db
 from src.forecast import ForecastBill, ForecastCycleOverride, build_bill_history, last_cycle_end
 from src.forecast.bill import validate_recurrence_config
-from src.models import BankAccount, Bill, CycleOverride, CycleType, RecurrenceType, User
+from src.models import BankAccount, Bill, BillEvent, CycleOverride, CycleType, RecurrenceType, User
 from src.schemas.bill import BillCreate, BillRead, BillUpdate
+from src.schemas.bill_event import BillEventListResponse
 from src.schemas.bill_history import BillHistoryEntry, BillHistoryResponse
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/bills", tags=["bills"])
@@ -55,6 +57,8 @@ async def create_bill(
     _validate_or_422(payload.recurrence_type, payload.recurrence_config)
     bill = Bill(account_id=account.id, **payload.model_dump())
     db.add(bill)
+    await db.flush()  # assigns bill.id, needed for the event's FK
+    db.add(created_event(bill))
     await db.commit()
     await db.refresh(bill)
     return bill
@@ -90,7 +94,8 @@ async def import_bills(
 
     bills = [Bill(account_id=account.id, **payload.model_dump()) for payload in parsed_bills]
     db.add_all(bills)
-    await db.flush()
+    await db.flush()  # assigns each bill.id, needed for the events' FK
+    db.add_all(created_event(bill) for bill in bills)
     ids = [bill.id for bill in bills]
     await db.commit()
     result = await db.execute(select(Bill).where(Bill.id.in_(ids)).order_by(Bill.id))
@@ -118,8 +123,10 @@ async def update_bill(
         update_data.get("recurrence_type", bill.recurrence_type),
         update_data.get("recurrence_config", bill.recurrence_config),
     )
+    before = {field: getattr(bill, field) for field in [*TRACKED_BILL_FIELDS, "notes", "enabled"]}
     for field, value in update_data.items():
         setattr(bill, field, value)
+    db.add_all(update_events(bill, update_data, before))
     await db.commit()
     await db.refresh(bill)
     return bill
@@ -217,6 +224,27 @@ async def get_bill_history(
             for line in page
         ],
     )
+
+
+@router.get("/{bill_id}/events", response_model=BillEventListResponse)
+async def get_bill_events(
+    db: AsyncSession = Depends(get_db),
+    bill: Bill = Depends(_get_owned_bill),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> BillEventListResponse:
+    count_result = await db.execute(
+        select(func.count()).select_from(BillEvent).where(BillEvent.bill_id == bill.id)
+    )
+    total = count_result.scalar_one()
+    result = await db.execute(
+        select(BillEvent)
+        .where(BillEvent.bill_id == bill.id)
+        .order_by(BillEvent.created_at.desc(), BillEvent.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return BillEventListResponse(bill_id=bill.id, total=total, events=list(result.scalars().all()))
 
 
 @router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -56,3 +56,6 @@ class Bill(Base):
     cycle_overrides: Mapped[list["CycleOverride"]] = relationship(
         back_populates="bill", cascade="all, delete-orphan"
     )
+    events: Mapped[list["BillEvent"]] = relationship(
+        back_populates="bill", cascade="all, delete-orphan"
+    )

@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # never be set in a deployed environment (nothing in infra/ sets this).
     dev_auth_bypass: bool = False
 
+    # Structured (JSON) logging level - see src/core/logging.py. INFO logs one
+    # line per request (method/path/status/duration); DEBUG adds library
+    # internals (SQLAlchemy, httpx) that are noisy for routine operation.
+    log_level: str = "INFO"
+
     @field_validator("database_url_readwrite")
     @classmethod
     def _normalize_for_asyncpg(cls, value: str) -> str:

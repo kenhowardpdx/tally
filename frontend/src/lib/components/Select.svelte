@@ -1,14 +1,18 @@
 <script lang="ts">
+	import Tooltip from '$lib/components/Tooltip.svelte';
+
 	let {
 		label,
 		value = $bindable(''),
 		id,
-		options
+		options,
+		tooltip
 	}: {
 		label?: string;
 		value?: string;
 		id?: string;
 		options: { value: string; label: string }[];
+		tooltip?: string;
 	} = $props();
 
 	const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
@@ -72,7 +76,12 @@
 
 <div class="relative flex flex-col gap-1" bind:this={containerEl}>
 	{#if label}
-		<label for={selectId} class="text-sm font-medium text-text">{label}</label>
+		<label for={selectId} class="flex items-center text-sm font-medium text-text">
+			{label}
+			{#if tooltip}
+				<Tooltip text={tooltip} />
+			{/if}
+		</label>
 	{/if}
 	<button
 		type="button"

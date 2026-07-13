@@ -20,7 +20,10 @@
 	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
 	import { cycleTypeLabels } from '$lib/cycle';
+	import { glossaryTerms } from '$lib/glossary';
 	import { onMount } from 'svelte';
+
+	const cycleTooltip = glossaryTerms.find((t) => t.term === 'Cycle type')!.definition;
 
 	const accountId = $derived(Number($page.params.id));
 
@@ -286,6 +289,7 @@
 			label="Cycle"
 			bind:value={cycleType}
 			options={cycleTypeOptions.map((option) => ({ value: option, label: cycleTypeLabels[option] }))}
+			tooltip={cycleTooltip}
 		/>
 		<Button type="submit" disabled={calculating || loading}>Calculate</Button>
 	</form>

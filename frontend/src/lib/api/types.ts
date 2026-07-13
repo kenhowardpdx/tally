@@ -184,6 +184,16 @@ export interface BillEventListResponse {
 	events: BillEvent[];
 }
 
+export interface BillEventCycleCount {
+	cycle_start_date: string;
+	count: number;
+}
+
+export interface BillEventCycleCountsResponse {
+	bill_id: number;
+	counts: BillEventCycleCount[];
+}
+
 export interface BillHistoryResponse {
 	bill_id: number;
 	total: number;

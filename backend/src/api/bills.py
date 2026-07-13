@@ -13,7 +13,7 @@ from src.forecast import ForecastBill, ForecastCycleOverride, build_bill_history
 from src.forecast.bill import validate_recurrence_config
 from src.models import BankAccount, Bill, BillEvent, CycleOverride, CycleType, RecurrenceType, User
 from src.schemas.bill import BillCreate, BillRead, BillUpdate
-from src.schemas.bill_event import BillEventListResponse
+from src.schemas.bill_event import BillEventCycleCount, BillEventCycleCountsResponse, BillEventListResponse
 from src.schemas.bill_history import BillHistoryEntry, BillHistoryResponse
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/bills", tags=["bills"])
@@ -230,21 +230,52 @@ async def get_bill_history(
 async def get_bill_events(
     db: AsyncSession = Depends(get_db),
     bill: Bill = Depends(_get_owned_bill),
+    cycle_start_date: date | None = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> BillEventListResponse:
-    count_result = await db.execute(
-        select(func.count()).select_from(BillEvent).where(BillEvent.bill_id == bill.id)
-    )
+    # cycle_start_date narrows to just that cycle's events (bill-level
+    # events like "created" have no cycle_start_date and are excluded) -
+    # used by the Cycle History table's per-row "N changes" expansion, so it
+    # doesn't have to fetch and filter the bill's entire activity log
+    # client-side.
+    filters = [BillEvent.bill_id == bill.id]
+    if cycle_start_date is not None:
+        filters.append(BillEvent.cycle_start_date == cycle_start_date)
+
+    count_result = await db.execute(select(func.count()).select_from(BillEvent).where(*filters))
     total = count_result.scalar_one()
     result = await db.execute(
         select(BillEvent)
-        .where(BillEvent.bill_id == bill.id)
+        .where(*filters)
         .order_by(BillEvent.created_at.desc(), BillEvent.id.desc())
         .offset(offset)
         .limit(limit)
     )
     return BillEventListResponse(bill_id=bill.id, total=total, events=list(result.scalars().all()))
+
+
+@router.get("/{bill_id}/events/cycle-counts", response_model=BillEventCycleCountsResponse)
+async def get_bill_event_cycle_counts(
+    db: AsyncSession = Depends(get_db),
+    bill: Bill = Depends(_get_owned_bill),
+) -> BillEventCycleCountsResponse:
+    """How many events exist per cycle, across the bill's whole history - lets
+    the Cycle History table show a "N changes" affordance on every row in one
+    request instead of querying per row. Grouping raw event rows needs none
+    of get_bill_history's cycle-boundary/anchor logic: each cycle-scoped
+    event already recorded the exact cycle_start_date its override used.
+    """
+    result = await db.execute(
+        select(BillEvent.cycle_start_date, func.count())
+        .where(BillEvent.bill_id == bill.id, BillEvent.cycle_start_date.is_not(None))
+        .group_by(BillEvent.cycle_start_date)
+    )
+    counts = [
+        BillEventCycleCount(cycle_start_date=cycle_start_date, count=count)
+        for cycle_start_date, count in result.all()
+    ]
+    return BillEventCycleCountsResponse(bill_id=bill.id, counts=counts)
 
 
 @router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)

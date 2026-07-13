@@ -391,6 +391,17 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       to bills only (not windfalls) — the ask was specifically about bill audit history.
       Frontend: an "Activity" timeline on the existing bill history page, alongside the
       cycle-by-cycle table.
+- [x] 3.13 Bridge Cycle History and Activity instead of merging them - they're different
+      shapes (one row per cycle occurrence showing current state, vs. one row per change
+      including superseded intermediate ones) so a full merge would lose one or the other.
+      Each Cycle History row now shows an "N changes" affordance when that cycle has
+      activity, expanding inline to the same event/diff rendering the Activity tab uses,
+      scoped to just that `cycle_start_date`. Backend: `cycle_start_date` filter added to
+      `GET .../bills/{bill_id}/events`, plus a new `GET .../bills/{bill_id}/events/cycle-counts`
+      (grouped counts per cycle, one request covers every visible row rather than querying
+      per row) — both in `backend/src/api/bills.py`. No cycle-boundary computation needed
+      for the counts endpoint since each cycle-scoped event already recorded the exact
+      `cycle_start_date` its override used.
 
 
 ## Phase 4 — Multi-account dashboard & polish
@@ -829,3 +840,18 @@ session (or a fresh Claude Code instance) orient in under a minute.
   of the GitHub Actions OIDC role. Next: whatever Ken decides on the flagged items above, or any
   newly-discovered polish item - Phase 5 stays open/ongoing per its own header rather than ever
   being "complete."
+- 2026-07-13: Shipped 3.13, bridging Cycle History and Activity after a design discussion
+  about whether the two views should just be one - concluded no (different
+  cardinality: one row per cycle vs. one row per change, plus bill-level events that
+  aren't tied to any cycle at all), but a lightweight bridge was worth building. Each
+  Cycle History row now shows an "N changes" link when that cycle has activity,
+  expanding inline via a lazily-fetched, cycle-scoped slice of the same event data the
+  Activity tab renders (`cycle_start_date` filter on `GET .../bills/{bill_id}/events`,
+  plus a new grouped-counts endpoint so the whole table's badges come from one request
+  instead of one per row). 151 backend tests pass (3 new), `svelte-check` and 23
+  frontend tests pass. Verified end-to-end in-browser: created a bill whose due date
+  landed in the account's first forecast cycle, applied a paid+amount+notes cycle
+  override via the API, confirmed the "3 changes" badge appeared, expanded to show all
+  three diffed events, and collapsed again without refetching. Next: Phase 5's
+  remaining items, the local-dev/test DB isolation footgun, or any newly-discovered
+  polish item.

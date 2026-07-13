@@ -1,5 +1,11 @@
 import { apiFetch, apiJson, ApiError } from '$lib/api';
-import type { Bill, BillEventListResponse, BillHistoryResponse, BillInput } from '$lib/api/types';
+import type {
+	Bill,
+	BillEventCycleCountsResponse,
+	BillEventListResponse,
+	BillHistoryResponse,
+	BillInput
+} from '$lib/api/types';
 
 export function listBills(accountId: number): Promise<Bill[]> {
 	return apiJson(`/api/v1/accounts/${accountId}/bills`);
@@ -42,13 +48,21 @@ export function getBillHistory(
 export function getBillEvents(
 	accountId: number,
 	billId: number,
-	params: { limit?: number; offset?: number } = {}
+	params: { limit?: number; offset?: number; cycle_start_date?: string } = {}
 ): Promise<BillEventListResponse> {
 	const query = new URLSearchParams();
 	if (params.limit != null) query.set('limit', String(params.limit));
 	if (params.offset != null) query.set('offset', String(params.offset));
+	if (params.cycle_start_date != null) query.set('cycle_start_date', params.cycle_start_date);
 	const qs = query.toString();
 	return apiJson(`/api/v1/accounts/${accountId}/bills/${billId}/events${qs ? `?${qs}` : ''}`);
+}
+
+export function getBillEventCycleCounts(
+	accountId: number,
+	billId: number
+): Promise<BillEventCycleCountsResponse> {
+	return apiJson(`/api/v1/accounts/${accountId}/bills/${billId}/events/cycle-counts`);
 }
 
 export async function exportBillsCsv(accountId: number): Promise<Blob> {

@@ -467,9 +467,57 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       reusing the same expandable-row pattern as the real forecast page. A dedicated
       `frontend/src/lib/api/demo.ts` client deliberately bypasses `apiFetch` (which attaches
       an Auth0 access token via `getAccessToken()`, throwing for a logged-out visitor).
+- [x] 4.7 Footer (logo + copyright) on every page, plus real Privacy Policy and Terms and
+      Conditions pages with placeholder-but-substantive copy (what data Tally actually
+      collects - no bank-account linking/Plaid, only user-entered bill/transaction/windfall
+      data - and who processes it: Auth0, AWS, Neon). `Footer.svelte` lives in the root
+      layout so it's present logged in or out; `/privacy` and `/terms` are public routes
+      outside the `(app)` group.
+
+      **Where does consent to these policies fit, given Auth0 handles signup?** Two options:
+      1. Customize Auth0's hosted Universal Login signup page to add a consent
+         checkbox/acknowledgment step (via Auth0 Actions or the Forms feature).
+      2. Track acceptance ourselves, post-signup, in our own backend.
+
+      Went with **(2)**. The deciding factor is that the Auth0 tenant itself isn't managed
+      by this codebase at all - creating it was a manual console step (see Phase 0's notes
+      above), and nothing in `infra/` provisions or configures it beyond passing its
+      domain/audience to the Lambda as plain variables. Customizing the hosted Universal
+      Login page to add a checkbox lives entirely in the Auth0 dashboard, outside version
+      control - it would need to be manually re-applied to every environment's tenant (dev,
+      staging, prod, whatever comes later), can't be code-reviewed or diffed, and has no
+      local equivalent at all: this app's local dev flow bypasses Auth0's hosted login
+      completely via `DEV_AUTH_BYPASS`/`PUBLIC_DEV_AUTH_BYPASS` (see `core/auth.py`), so a
+      dashboard-only consent step could never be exercised or tested locally or in CI.
+
+      Tracking acceptance ourselves keeps consent fully inside the codebase and identical
+      across every environment including local dev: `User.terms_accepted_at`
+      (`backend/src/models/user.py`, migration `a1b2c3d4e5f6`) is null until the user
+      accepts, set via `POST /api/v1/me/consent` (`backend/src/api/me.py`, idempotent - a
+      second accept keeps the original timestamp). `(app)/+layout.svelte` checks
+      `GET /api/v1/me/consent` right after auth resolves and blocks every route in the group
+      behind an interstitial (linking to both legal pages, with an "I agree" button) until
+      it's accepted - existing users retroactively see this once, next login, since the
+      column defaults to null.
+
+      **The real tradeoff**: this means consent isn't gating account *creation* itself - a
+      user is JIT-provisioned into our `users` table (see `get_current_db_user` in
+      `api/deps.py`) as soon as they complete Auth0 login, before they've seen or accepted
+      anything. In practice this is a narrow window (the interstitial is the very next thing
+      they see, and no other route is reachable without passing it first), but it's not the
+      same guarantee as a signup-time checkbox that blocks the Auth0 account from being
+      created at all. If Auth0 Organizations/Actions or a dedicated legal/compliance review
+      ever becomes worth the operational overhead of managing tenant config outside this
+      repo, revisit option (1) - tracked as a Phase 5 follow-up below.
 
 ## Phase 5 — Production hardening (ongoing, lower priority)
 
+- [ ] Legal/compliance review of the Privacy Policy and Terms and Conditions pages
+      (`frontend/src/routes/privacy/`, `frontend/src/routes/terms/`) before treating them as
+      production-ready - current copy is a reasonable placeholder, not lawyer-reviewed.
+      Revisit at the same time whether signup-time Auth0 consent (option 1 in Phase 4.7's
+      note above) is worth the tenant-configuration overhead, if a stricter guarantee than
+      "consent immediately after account creation" becomes a real requirement.
 - [ ] Structured logging / basic observability within free-tier limits (#19)
 - [ ] Confirm Neon's backup/retention behavior meets expectations, plus a documented
       restore drill / disaster-recovery path (#20)
@@ -634,3 +682,18 @@ session (or a fresh Claude Code instance) orient in under a minute.
   Folded in this session because it hadn't been merged yet: Phase 3's cycle-reconciliation work
   from the prior session (3.5-3.11) - both ship together in the PR this session opens. Next:
   Phase 5 (production hardening), or any newly-discovered polish item.
+- 2026-07-13: Added Phase 4.7 (footer, Privacy Policy/Terms pages, consent tracking) to the
+  same PR before merge. `Footer.svelte` (logo + copyright + legal links) lives in the root
+  layout so it's on every page; `/privacy` and `/terms` are public routes with real (if
+  placeholder) copy specific to what Tally actually does - no bank-account linking, only
+  user-entered data. Worked through where Auth0 signup fits with policy consent (full
+  reasoning under 4.7 above): tracked acceptance in our own backend
+  (`User.terms_accepted_at`, `POST /api/v1/me/consent`) rather than customizing Auth0's
+  hosted Universal Login page, since the Auth0 tenant isn't managed by this codebase at all
+  (a manual console step since Phase 0) and a dashboard-only consent step would have no local
+  dev or CI equivalent given `DEV_AUTH_BYPASS` skips Auth0's hosted login entirely. Noted the
+  real tradeoff (JIT user provisioning happens on first login, slightly before consent is
+  captured) and logged a Phase 5 follow-up to revisit if a stricter guarantee is ever needed.
+  Verified end-to-end in-browser: interstitial blocks every (app) route until accepted,
+  acceptance persists across reload, footer/legal pages render correctly down to 375px.
+  Next: Phase 5, or any newly-discovered polish item.

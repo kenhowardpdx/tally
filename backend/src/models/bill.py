@@ -53,3 +53,6 @@ class Bill(Base):
 
     bank_account: Mapped["BankAccount"] = relationship(back_populates="bills")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="bill")
+    cycle_overrides: Mapped[list["CycleOverride"]] = relationship(
+        back_populates="bill", cascade="all, delete-orphan"
+    )

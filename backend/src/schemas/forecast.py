@@ -25,7 +25,10 @@ class ForecastBillLine(BaseModel):
     bill_id: int
     name: str
     amount_cents: int
+    forecasted_amount_cents: int
     due_date: date
+    completed: bool
+    notes: str | None
 
 
 class ForecastTransactionLine(BaseModel):
@@ -39,7 +42,10 @@ class ForecastWindfallLine(BaseModel):
     windfall_id: int
     name: str
     amount_cents: int
+    forecasted_amount_cents: int
     expected_date: date
+    completed: bool
+    notes: str | None
 
 
 class ForecastCycle(BaseModel):

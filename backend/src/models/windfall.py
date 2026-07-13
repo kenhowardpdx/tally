@@ -21,3 +21,6 @@ class Windfall(Base):
     )
 
     bank_account: Mapped["BankAccount"] = relationship(back_populates="windfalls")
+    cycle_overrides: Mapped[list["CycleOverride"]] = relationship(
+        back_populates="windfall", cascade="all, delete-orphan"
+    )

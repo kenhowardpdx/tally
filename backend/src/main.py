@@ -2,13 +2,14 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
-from src.api import accounts, bills, forecast, transactions, windfalls
+from src.api import accounts, bills, cycle_overrides, forecast, transactions, windfalls
 from src.core.auth import get_current_user
 
 app = FastAPI()
 
 app.include_router(accounts.router)
 app.include_router(bills.router)
+app.include_router(cycle_overrides.router)
 app.include_router(forecast.router)
 app.include_router(transactions.router)
 app.include_router(windfalls.router)

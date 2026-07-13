@@ -6,12 +6,13 @@ from src.api.deps import get_owned_bank_account
 from src.core.database import get_db
 from src.forecast import (
     ForecastBill,
+    ForecastCycleOverride,
     ForecastTransaction,
     ForecastWindfall,
     get_forecast,
     last_cycle_end,
 )
-from src.models import BankAccount, Bill, Transaction, Windfall
+from src.models import BankAccount, Bill, CycleOverride, Transaction, Windfall
 from src.schemas.forecast import (
     ForecastBillLine,
     ForecastCycle,
@@ -90,6 +91,25 @@ async def compute_forecast(
         for windfall in windfalls_result.scalars().all()
     ]
 
+    overrides_result = await db.execute(
+        select(CycleOverride).where(
+            CycleOverride.account_id == account.id,
+            CycleOverride.cycle_start_date >= payload.start_date,
+            CycleOverride.cycle_start_date <= query_end_date,
+        )
+    )
+    forecast_overrides = [
+        ForecastCycleOverride(
+            bill_id=override.bill_id,
+            windfall_id=override.windfall_id,
+            cycle_start_date=override.cycle_start_date,
+            completed=override.completed,
+            override_amount_cents=override.override_amount_cents,
+            notes=override.notes,
+        )
+        for override in overrides_result.scalars().all()
+    ]
+
     forecast = get_forecast(
         forecast_bills,
         payload.cycle_type,
@@ -99,6 +119,7 @@ async def compute_forecast(
         payload.income_per_cycle_cents,
         transactions=forecast_transactions,
         windfalls=forecast_windfalls,
+        overrides=forecast_overrides,
     )
 
     # Persist as the account's last-used forecast settings (side effect of an
@@ -123,7 +144,10 @@ async def compute_forecast(
                         bill_id=line.bill_id,
                         name=line.name,
                         amount_cents=line.amount_cents,
+                        forecasted_amount_cents=line.forecasted_amount_cents,
                         due_date=line.due_date,
+                        completed=line.completed,
+                        notes=line.notes,
                     )
                     for line in cycle.bills
                 ],
@@ -141,7 +165,10 @@ async def compute_forecast(
                         windfall_id=line.windfall_id,
                         name=line.name,
                         amount_cents=line.amount_cents,
+                        forecasted_amount_cents=line.forecasted_amount_cents,
                         expected_date=line.expected_date,
+                        completed=line.completed,
+                        notes=line.notes,
                     )
                     for line in cycle.windfalls
                 ],

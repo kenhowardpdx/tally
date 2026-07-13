@@ -6,6 +6,7 @@ from src.forecast.cycle import (
     CycleWindfallLine,
     build_cycle,
 )
+from src.forecast.cycle_override import ForecastCycleOverride
 from src.forecast.engine import (
     ForecastCycle,
     ForecastResult,
@@ -23,6 +24,7 @@ __all__ = [
     "CycleWindfallLine",
     "ForecastBill",
     "ForecastCycle",
+    "ForecastCycleOverride",
     "ForecastResult",
     "ForecastTransaction",
     "ForecastWindfall",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -12,6 +13,7 @@ from src.forecast.cycle import (
     CycleWindfallLine,
     build_cycle,
 )
+from src.forecast.cycle_override import ForecastCycleOverride
 from src.forecast.transaction import ForecastTransaction
 from src.forecast.windfall import ForecastWindfall
 from src.models.bank_account import CycleType
@@ -134,9 +136,25 @@ def get_forecast(
     income_per_cycle_cents: int,
     transactions: list[ForecastTransaction] | None = None,
     windfalls: list[ForecastWindfall] | None = None,
+    overrides: list[ForecastCycleOverride] | None = None,
 ) -> ForecastResult:
     transactions = transactions or []
     windfalls = windfalls or []
+
+    # Group by cycle_start_date first, then by target id, since a
+    # cycle_overrides row only applies to the one cycle it names - build_cycle
+    # needs just the slice relevant to the cycle it's currently building.
+    bill_overrides_by_cycle_start: dict[date, dict[int, ForecastCycleOverride]] = defaultdict(dict)
+    windfall_overrides_by_cycle_start: dict[date, dict[int, ForecastCycleOverride]] = defaultdict(
+        dict
+    )
+    for override in overrides or []:
+        if override.bill_id is not None:
+            bill_overrides_by_cycle_start[override.cycle_start_date][override.bill_id] = override
+        else:
+            windfall_overrides_by_cycle_start[override.cycle_start_date][
+                override.windfall_id
+            ] = override
 
     schedulable: list[ForecastBill] = []
     unscheduled: list[UnscheduledBill] = []
@@ -151,7 +169,15 @@ def get_forecast(
     cycles: list[ForecastCycle] = []
 
     for current_start, current_end in _iter_cycle_bounds(cycle_type, start_date, end_date):
-        cycle = build_cycle(schedulable, transactions, windfalls, current_start, current_end)
+        cycle = build_cycle(
+            schedulable,
+            transactions,
+            windfalls,
+            current_start,
+            current_end,
+            bill_overrides=bill_overrides_by_cycle_start.get(current_start),
+            windfall_overrides=windfall_overrides_by_cycle_start.get(current_start),
+        )
         running_balance += income_per_cycle_cents + cycle.net_cents
         cycles.append(
             ForecastCycle(

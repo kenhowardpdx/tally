@@ -20,3 +20,13 @@ class BillEventListResponse(BaseModel):
     bill_id: int
     total: int
     events: list[BillEventRead]
+
+
+class BillEventCycleCount(BaseModel):
+    cycle_start_date: date
+    count: int
+
+
+class BillEventCycleCountsResponse(BaseModel):
+    bill_id: int
+    counts: list[BillEventCycleCount]

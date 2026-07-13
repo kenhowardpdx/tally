@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { getBillEvents, getBillHistory, listBills } from '$lib/api/bills';
+	import { getBillEventCycleCounts, getBillEvents, getBillHistory, listBills } from '$lib/api/bills';
 	import type { Bill, BillEvent, BillHistoryEntry } from '$lib/api/types';
 	import { describeBillEvent } from '$lib/billEvents';
 	import Button from '$lib/components/Button.svelte';
@@ -26,6 +26,19 @@
 	let eventsTotal = $state(0);
 	let eventsLoadingMore = $state(false);
 
+	// How many activity events exist per cycle_start_date, across the bill's
+	// whole history (not just the currently-loaded page of cycle entries) -
+	// fetched once up front so every row's "N changes" affordance is free.
+	let cycleCounts = $state<Record<string, number>>({});
+	// Keyed by the same row key the #each below uses (due_date + cycle_start_date),
+	// since a bill that recurs more than once within a single cycle produces
+	// multiple rows sharing one cycle_start_date - each expands independently.
+	let expandedRows = $state<Record<string, boolean>>({});
+	// Keyed by cycle_start_date and shared across same-cycle rows, so
+	// expanding a second row for an already-fetched cycle doesn't refetch.
+	let cycleEvents = $state<Record<string, BillEvent[]>>({});
+	let cycleEventsLoading = $state<Record<string, boolean>>({});
+
 	let error = $state<string | null>(null);
 
 	function formatAmount(cents: number): string {
@@ -43,20 +56,44 @@
 		loading = true;
 		error = null;
 		try {
-			const [bills, history, eventList] = await Promise.all([
+			const [bills, history, eventList, cycleCountsResponse] = await Promise.all([
 				listBills(accountId),
 				getBillHistory(accountId, billId, { limit: PAGE_SIZE, offset: 0 }),
-				getBillEvents(accountId, billId, { limit: PAGE_SIZE, offset: 0 })
+				getBillEvents(accountId, billId, { limit: PAGE_SIZE, offset: 0 }),
+				getBillEventCycleCounts(accountId, billId)
 			]);
 			bill = bills.find((b) => b.id === billId) ?? null;
 			entries = history.entries;
 			total = history.total;
 			events = eventList.events;
 			eventsTotal = eventList.total;
+			cycleCounts = Object.fromEntries(
+				cycleCountsResponse.counts.map((c) => [c.cycle_start_date, c.count])
+			);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function toggleRowExpansion(entry: BillHistoryEntry) {
+		const rowKey = entry.due_date + entry.cycle_start_date;
+		const nowExpanded = !expandedRows[rowKey];
+		expandedRows = { ...expandedRows, [rowKey]: nowExpanded };
+		if (!nowExpanded || cycleEvents[entry.cycle_start_date]) return;
+
+		cycleEventsLoading = { ...cycleEventsLoading, [entry.cycle_start_date]: true };
+		try {
+			const res = await getBillEvents(accountId, billId, {
+				cycle_start_date: entry.cycle_start_date,
+				limit: 200
+			});
+			cycleEvents = { ...cycleEvents, [entry.cycle_start_date]: res.events };
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			cycleEventsLoading = { ...cycleEventsLoading, [entry.cycle_start_date]: false };
 		}
 	}
 
@@ -148,10 +185,13 @@
 							<th class="px-4 py-2 text-right font-medium">Variance</th>
 							<th class="px-4 py-2 font-medium">Paid</th>
 							<th class="px-4 py-2 font-medium">Notes</th>
+							<th class="px-4 py-2 font-medium">Activity</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each entries as entry (entry.due_date + entry.cycle_start_date)}
+							{@const rowKey = entry.due_date + entry.cycle_start_date}
+							{@const count = cycleCounts[entry.cycle_start_date] ?? 0}
 							<tr class="border-b border-slate-100 text-sm last:border-0">
 								<td class="px-4 py-2">{entry.due_date}</td>
 								<td class="px-4 py-2 text-slate-500">
@@ -180,7 +220,48 @@
 									{/if}
 								</td>
 								<td class="px-4 py-2 text-slate-600">{entry.notes ?? ''}</td>
+								<td class="px-4 py-2">
+									{#if count > 0}
+										<button
+											class="text-xs text-primary underline"
+											onclick={() => toggleRowExpansion(entry)}
+										>
+											{count} change{count === 1 ? '' : 's'}
+											{expandedRows[rowKey] ? '▴' : '▾'}
+										</button>
+									{:else}
+										<span class="text-xs text-slate-400">-</span>
+									{/if}
+								</td>
 							</tr>
+							{#if expandedRows[rowKey]}
+								<tr class="border-b border-slate-100 bg-slate-50 text-xs">
+									<td class="px-4 py-3" colspan="8">
+										{#if cycleEventsLoading[entry.cycle_start_date]}
+											<p class="text-slate-500">Loading…</p>
+										{:else}
+											<ul class="space-y-2">
+												{#each cycleEvents[entry.cycle_start_date] ?? [] as event (event.id)}
+													{@const described = describeBillEvent(event, formatAmount)}
+													<li>
+														<div class="flex flex-wrap items-baseline justify-between gap-x-4">
+															<span class="font-medium text-text">{described.label}</span>
+															<span class="text-slate-500">{formatTimestamp(event.created_at)}</span>
+														</div>
+														{#if described.details.length}
+															<ul class="mt-0.5 space-y-0.5 text-slate-600">
+																{#each described.details as detail (detail)}
+																	<li>{detail}</li>
+																{/each}
+															</ul>
+														{/if}
+													</li>
+												{/each}
+											</ul>
+										{/if}
+									</td>
+								</tr>
+							{/if}
 						{/each}
 					</tbody>
 				</Table>

@@ -247,3 +247,92 @@ async def test_events_scoped_to_owning_user(client: AsyncClient):
     _login_as("auth0|someone-else")
     res = await client.get(f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events")
     assert res.status_code == 404
+
+
+async def test_events_filtered_by_cycle_start_date_excludes_other_cycles_and_bill_level(
+    client: AsyncClient,
+):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    # A bill-level event (no cycle_start_date) plus two different cycles'
+    # worth of cycle-scoped events.
+    await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}", json={"amount_cents": 160000}
+    )
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2026-01-01",
+            "completed": True,
+        },
+    )
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2026-02-01",
+            "completed": True,
+        },
+    )
+
+    res = await client.get(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events"
+        "?cycle_start_date=2026-01-01"
+    )
+    body = res.json()
+    assert body["total"] == 1
+    assert body["events"][0]["event_type"] == "cycle_marked_paid"
+    assert body["events"][0]["cycle_start_date"] == "2026-01-01"
+
+
+async def test_cycle_counts_groups_by_cycle_and_excludes_bill_level_events(
+    client: AsyncClient,
+):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    # Bill-level events - must not appear in any cycle's count.
+    await client.patch(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}", json={"notes": "hi"}
+    )
+    # Two events in the same cycle (paid, then a note).
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2026-01-01",
+            "completed": True,
+            "notes": "paid via check",
+        },
+    )
+    # One event in a different cycle.
+    await client.put(
+        "/api/v1/cycle-overrides",
+        json={
+            "account_id": account["id"],
+            "bill_id": bill["id"],
+            "cycle_start_date": "2026-02-01",
+            "completed": True,
+        },
+    )
+
+    res = await client.get(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events/cycle-counts"
+    )
+    assert res.status_code == 200
+    counts = {c["cycle_start_date"]: c["count"] for c in res.json()["counts"]}
+    assert counts == {"2026-01-01": 2, "2026-02-01": 1}
+
+
+async def test_cycle_counts_scoped_to_owning_user(client: AsyncClient):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+
+    _login_as("auth0|someone-else")
+    res = await client.get(
+        f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events/cycle-counts"
+    )
+    assert res.status_code == 404

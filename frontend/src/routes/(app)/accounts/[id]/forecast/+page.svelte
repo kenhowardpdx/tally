@@ -259,12 +259,15 @@
 
 <AccountNav {accountId} current="forecast" />
 <h1 class="mt-2 text-2xl font-semibold text-text">
-	Forecast{#if account}
-		({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+	Forecast{#if account}{' '}({account.name}{#if account.institution}{' '}- {account.institution}{/if}){/if}
 </h1>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
+{/if}
+
+{#if loading}
+	<p class="mt-4 text-sm text-slate-500">Loading account...</p>
 {/if}
 
 <Card>

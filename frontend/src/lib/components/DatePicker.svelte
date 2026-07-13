@@ -14,6 +14,12 @@
 
 	let open = $state(false);
 	let containerEl = $state<HTMLDivElement | undefined>();
+	// Anchoring the popover to the trigger's left edge overflows the
+	// viewport on narrow screens whenever the trigger sits right of center
+	// (e.g. the 2nd field in a wrapped row) - measured once on open rather
+	// than reactively, since it only matters at the moment the popover
+	// actually appears.
+	let alignRight = $state(false);
 
 	function parseISO(iso: string): Date | null {
 		if (!iso) return null;
@@ -100,7 +106,13 @@
 	<button
 		type="button"
 		id={inputId}
-		onclick={() => (open = !open)}
+		onclick={(event) => {
+			if (!open) {
+				const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+				alignRight = rect.left > window.innerWidth / 2;
+			}
+			open = !open;
+		}}
 		aria-haspopup="dialog"
 		aria-expanded={open}
 		class="rounded-card border border-slate-300 px-3 py-2 text-left text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -110,7 +122,9 @@
 
 	{#if open}
 		<div
-			class="absolute top-full z-10 mt-1 w-64 rounded-card border border-slate-200 bg-surface p-3 shadow-card"
+			class="absolute top-full z-10 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-card border border-slate-200 bg-surface p-3 shadow-card {alignRight
+				? 'right-0'
+				: 'left-0'}"
 			role="dialog"
 			aria-label="Choose date"
 		>

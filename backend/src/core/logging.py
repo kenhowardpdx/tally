@@ -57,6 +57,13 @@ async def log_requests(
                 "path": request.url.path,
                 "status_code": response.status_code,
                 "duration_ms": duration_ms,
+                # Set by get_current_db_user (backend/src/api/deps.py) once auth
+                # resolves - None for unauthenticated/anonymous requests.
+                "user_id": getattr(request.state, "user_id", None),
+                # CloudFront auto-injects this on every request it forwards to
+                # the origin (infra/modules/cloudfront/main.tf) - absent in
+                # local dev, where requests don't go through CloudFront.
+                "viewer_country": request.headers.get("cloudfront-viewer-country"),
             }
         },
     )

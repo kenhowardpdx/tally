@@ -4,6 +4,7 @@ from src.models.bill_event import BillEvent, BillEventType
 from src.models.cycle_override import CycleOverride
 from src.models.transaction import Transaction
 from src.models.user import User
+from src.models.user_daily_activity import UserDailyActivity
 from src.models.windfall import Windfall
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "RecurrenceType",
     "Transaction",
     "User",
+    "UserDailyActivity",
     "Windfall",
 ]

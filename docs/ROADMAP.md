@@ -616,6 +616,37 @@ below as items only Ken can close (real money/real lawyer, not something to gues
       cold-start hiccup becomes added latency instead of a broken page. Covered by 4 new
       Vitest cases (`frontend/src/lib/__tests__/api.test.ts`) using fake timers.
 
+## Phase 6 — Usage analytics
+
+**Status**: local-first pass complete - see [docs/ANALYTICS.md](ANALYTICS.md) for the full
+metrics glossary, how to run the report, and the CloudWatch Logs Insights companions. An
+AWS-hosted, admin-only dashboard is an explicit follow-up, not part of this pass.
+
+- [x] Track per-user activity for MAU/DAU/stickiness/stale-account/cohort-retention queries -
+      `users.last_active_at` (throttled to once/hour) + append-only `user_daily_activity`
+      (one row per user per active UTC day), both written by `get_current_db_user`
+      (`backend/src/api/deps.py`) so no per-endpoint instrumentation is needed. A single
+      mutable timestamp can't answer historical trend/cohort questions once time has passed,
+      hence the separate daily-activity table.
+- [x] Attribute the existing per-request access log to a user and a region -
+      `backend/src/core/logging.py`'s `log_requests` now includes `user_id` (set on
+      `request.state` by `get_current_db_user`) and `viewer_country` (CloudFront
+      auto-injects `CloudFront-Viewer-Country` on every request it forwards to the origin -
+      no infra change needed). Endpoint popularity, latency, and time-of-day patterns are
+      queried from CloudWatch Logs Insights, not duplicated into Postgres.
+- [x] Local reporting: `scripts/analytics/queries.sql` (named queries: MAU/DAU/WAU,
+      stickiness, signup trend, stale-account buckets, cohort retention) and
+      `scripts/analytics/report.py` (prints a terminal summary using
+      `DATABASE_URL_READONLY`, already provisioned in `.secrets`/`infra/modules/lambda/main.tf`
+      but previously unused by the app).
+- [ ] AWS-hosted, admin-only dashboard (IAM-authorizer-gated Lambda + API Gateway route) so
+      metrics are visible without a laptop. **Not done this pass** - deferred per Ken's
+      explicit local-first decision; revisit once it's clear which metrics actually get
+      checked regularly.
+- [ ] Feature-adoption metrics (% of users who've ever used windfalls/CSV import/forecast)
+      - not yet queried; would join against each feature's table via `bank_accounts.user_id`
+      rather than `user_daily_activity`.
+
 ## Legacy GitHub Project issue crosswalk
 
 Use this when closing the old project-management issues so their intent stays visible here:

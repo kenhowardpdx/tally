@@ -26,6 +26,10 @@ class User(Base):
     # there consistently across environments. See docs/ROADMAP.md's
     # consent-tracking note for the full tradeoff.
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Updated at most once/hour by get_current_db_user (backend/src/api/deps.py) - a
+    # cheap write-throttle guard, not a source of historical trends. Durable
+    # per-day history for MAU/DAU/retention queries lives in `user_daily_activity`.
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     bank_accounts: Mapped[list["BankAccount"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

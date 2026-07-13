@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.core.database import get_db
-from src.models import BankAccount, Bill, CycleOverride, User, Windfall
+from src.models import BankAccount, Bill, BillEvent, BillEventType, CycleOverride, User, Windfall
 from src.schemas.cycle_override import CycleOverrideRead, CycleOverrideUpsert
 
 router = APIRouter(tags=["cycle-overrides"])
@@ -52,7 +52,15 @@ async def upsert_cycle_override(
         )
     )
     override = result.scalar_one_or_none()
-    if override is None:
+    is_new = override is None
+    # A brand-new override always starts from these defaults (matching
+    # CycleOverride's column defaults) - reading them off `override` itself
+    # here would race the ORM's flush-time default application.
+    before_completed = False if is_new else override.completed
+    before_amount_cents = None if is_new else override.override_amount_cents
+    before_notes = None if is_new else override.notes
+
+    if is_new:
         override = CycleOverride(
             account_id=account.id,
             bill_id=payload.bill_id,
@@ -64,6 +72,48 @@ async def upsert_cycle_override(
     override.completed = payload.completed
     override.override_amount_cents = payload.override_amount_cents
     override.notes = payload.notes
+
+    # Cycle-scoped audit trail is bill-specific (the ask was a bill history
+    # feature) - windfalls don't get BillEvent rows.
+    if payload.bill_id is not None:
+        if payload.completed != before_completed:
+            db.add(
+                BillEvent(
+                    account_id=account.id,
+                    bill_id=payload.bill_id,
+                    event_type=(
+                        BillEventType.CYCLE_MARKED_PAID
+                        if payload.completed
+                        else BillEventType.CYCLE_MARKED_UNPAID
+                    ),
+                    cycle_start_date=payload.cycle_start_date,
+                )
+            )
+        if payload.override_amount_cents != before_amount_cents:
+            db.add(
+                BillEvent(
+                    account_id=account.id,
+                    bill_id=payload.bill_id,
+                    event_type=BillEventType.CYCLE_AMOUNT_CHANGED,
+                    cycle_start_date=payload.cycle_start_date,
+                    changes={
+                        "override_amount_cents": {
+                            "old": before_amount_cents,
+                            "new": payload.override_amount_cents,
+                        }
+                    },
+                )
+            )
+        if payload.notes != before_notes:
+            db.add(
+                BillEvent(
+                    account_id=account.id,
+                    bill_id=payload.bill_id,
+                    event_type=BillEventType.CYCLE_NOTES_CHANGED,
+                    cycle_start_date=payload.cycle_start_date,
+                    changes={"notes": {"old": before_notes, "new": payload.notes}},
+                )
+            )
 
     await db.commit()
     await db.refresh(override)

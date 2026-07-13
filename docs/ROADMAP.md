@@ -87,6 +87,7 @@ erDiagram
     BANK_ACCOUNTS ||--o{ CYCLE_OVERRIDES : has
     BILLS ||--o{ TRANSACTIONS : "generates (optional)"
     BILLS ||--o{ CYCLE_OVERRIDES : "overridden in cycle"
+    BILLS ||--o{ BILL_EVENTS : "audit trail"
     WINDFALLS ||--o{ CYCLE_OVERRIDES : "overridden in cycle"
 
     USERS {
@@ -144,6 +145,15 @@ erDiagram
         string notes "nullable"
         datetime created_at
         datetime updated_at
+    }
+    BILL_EVENTS {
+        int id PK
+        int account_id FK
+        int bill_id FK
+        enum event_type
+        date cycle_start_date "nullable – set only for cycle-scoped events"
+        jsonb changes "nullable – per-field {old, new} pairs"
+        datetime created_at
     }
 ```
 
@@ -370,6 +380,17 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       "History" action on the bills table). Renders a chronological table of each cycle's due date,
       cycle window, expected/actual amount, variance, paid state, and notes, with a simple
       offset-based "Load more" button rather than a full date-range picker UI.
+- [x] 3.12 Bill event/audit log — 3.10/3.11's "bill history" only ever showed forecasted
+      vs. actual per cycle (`cycle_overrides` state, not a change log). This adds a real
+      append-only trail: bill created, bill fields updated (amount/name/recurrence/dates),
+      notes changed, enabled/disabled — plus, per active cycle, marked paid/unpaid, the
+      cycle's override amount changed, and cycle-specific notes applied. New `bill_events`
+      table (`backend/src/models/bill_event.py`), written from `backend/src/api/bills.py`
+      (create/update/import) and `backend/src/api/cycle_overrides.py` (upsert, diffed
+      against the override's prior state), read via `GET .../bills/{bill_id}/events`. Scoped
+      to bills only (not windfalls) — the ask was specifically about bill audit history.
+      Frontend: an "Activity" timeline on the existing bill history page, alongside the
+      cycle-by-cycle table.
 
 
 ## Phase 4 — Multi-account dashboard & polish
@@ -567,6 +588,22 @@ below as items only Ken can close (real money/real lawyer, not something to gues
       runbook; `infra/README.md`'s stale architecture diagram (showed a Route 53 box that was
       never built) and inaccurate security claims (claimed Secrets Manager and least-privilege
       IAM before this session's actual fixes) corrected to match reality.
+- [x] Fix intermittent 502s on the first request after the app sits idle. Root cause: the
+      Lambda function (`infra/modules/lambda/main.tf`) never set `timeout`/`memory_size`, so
+      it ran on AWS's defaults - a 3-second timeout and 128MB of memory. A cold start
+      (importing FastAPI/SQLAlchemy/asyncpg, plus Neon's own compute waking from
+      scale-to-zero suspend) routinely exceeds 3 seconds; API Gateway surfaces that Lambda
+      execution error as a 502 rather than a normal error response. Fixed by raising
+      `timeout` to 15s and `memory_size` to 512MB (more memory also means more CPU during
+      init, shortening the cold start itself) - still comfortably inside the Lambda free
+      tier's 400,000 GB-seconds/month at this app's request volume. Deliberately not
+      provisioned concurrency, which eliminates cold starts entirely but costs a flat
+      monthly fee even while idle - not worth it against CLAUDE.md's cost-first philosophy
+      for a solo-developer app with long idle gaps between sessions. Belt-and-suspenders on
+      the frontend: `apiFetch` (`frontend/src/lib/api.ts`) now retries up to twice with a
+      short backoff on 502/503/504 specifically (not other error statuses), so a residual
+      cold-start hiccup becomes added latency instead of a broken page. Covered by 4 new
+      Vitest cases (`frontend/src/lib/__tests__/api.test.ts`) using fake timers.
 
 ## Legacy GitHub Project issue crosswalk
 
@@ -732,6 +769,40 @@ session (or a fresh Claude Code instance) orient in under a minute.
   Verified end-to-end in-browser: interstitial blocks every (app) route until accepted,
   acceptance persists across reload, footer/legal pages render correctly down to 375px.
   Next: Phase 5, or any newly-discovered polish item.
+- 2026-07-13: Shipped 3.12, a real bill event/audit log - `bill_events` table
+  (`backend/src/models/bill_event.py`, migration `c889d199265f`) written from
+  `backend/src/api/bills.py` (create/import → `created`; PATCH diffed into `updated` for
+  amount/name/recurrence/dates/account moves, plus separate `notes_changed` and
+  `enabled`/`disabled` events so those show up distinctly in the timeline rather than
+  buried in a generic diff) and `backend/src/api/cycle_overrides.py` (upsert diffed against
+  the override's prior state into `cycle_marked_paid`/`cycle_marked_unpaid`,
+  `cycle_amount_changed`, `cycle_notes_changed` - bill-scoped only, no windfall events).
+  Read via `GET .../bills/{bill_id}/events`, paginated the same way as the existing
+  cycle-history endpoint. Frontend: the bill history page
+  (`.../bills/[billId]/history/+page.svelte`) gained an "Activity" tab alongside the
+  existing "Cycle history" table, rendering each event with a human-readable label and a
+  field-level old→new diff (`frontend/src/lib/billEvents.ts`). Caught and fixed a real
+  footgun while testing: local dev's `DATABASE_URL_READWRITE` is shared between the app and
+  the pytest suite, and `tests/conftest.py`'s autouse schema fixture `drop_all`s every table
+  after the run, silently wiping the dev DB while `alembic_version` stays stamped at head
+  (discovered because the migration's `alembic upgrade head` did nothing - the tables were
+  just gone). Not fixed (out of scope for this feature - a pre-existing local-dev/test
+  isolation gap worth its own follow-up), just worked around locally via
+  `alembic stamp base && alembic upgrade head` to re-create the schema before browser
+  verification. Verified end-to-end in-browser via `DEV_AUTH_BYPASS` + Playwright (installed
+  ad hoc, not yet a committed project skill): created a bill, edited its amount/notes,
+  toggled enabled/disabled, and set a cycle override's paid/amount/notes via direct API
+  calls, then confirmed all eight resulting events render correctly on the Activity tab.
+  148 backend tests pass (11 new), `svelte-check` and the 19 frontend tests pass. Also
+  fixed a reported production bug the same session: intermittent 502s on the first request
+  after the app sat idle, root-caused to the Lambda function never setting
+  `timeout`/`memory_size` (running on AWS's 3s/128MB defaults, too tight for a cold
+  start) - raised to 15s/512MB in `infra/modules/lambda/main.tf` and added a short
+  502/503/504-only retry to `frontend/src/lib/api.ts`'s `apiFetch` as a client-side
+  backstop (see Phase 5 above for the full writeup). `terraform validate`/`fmt` clean; no
+  `terraform apply` run this session - the Lambda change ships on the next deploy via
+  `terraform-apply.yml`. Next: Phase 5's remaining items, the local-dev/test DB isolation
+  footgun above, or any newly-discovered polish item.
 - 2026-07-13: Phase 5 (production hardening) first pass, written up in full in the new
   `docs/OPERATIONS.md`. Shipped: JSON structured logging + a per-request access-log middleware
   (`backend/src/core/logging.py`); removed the Lambda role's unused, account-wide

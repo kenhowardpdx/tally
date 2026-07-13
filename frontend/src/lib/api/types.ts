@@ -147,6 +147,43 @@ export interface BillHistoryEntry {
 	variance_cents: number;
 }
 
+// Append-only audit trail, distinct from BillHistoryEntry above (which is
+// forecasted-vs-actual per cycle, derived from cycle_overrides state, not a
+// change log). cycle_start_date/changes' shape both vary by event_type:
+// - created: changes is a flat {field: value} snapshot, cycle_start_date null
+// - updated: changes is {field: {old, new}} for whichever fields changed,
+//   cycle_start_date null
+// - notes_changed: changes is {notes: {old, new}}, cycle_start_date null
+// - enabled / disabled: changes null, cycle_start_date null
+// - cycle_marked_paid / cycle_marked_unpaid: changes null, cycle_start_date set
+// - cycle_amount_changed: changes is {override_amount_cents: {old, new}}, cycle_start_date set
+// - cycle_notes_changed: changes is {notes: {old, new}}, cycle_start_date set
+export type BillEventType =
+	| 'created'
+	| 'updated'
+	| 'notes_changed'
+	| 'enabled'
+	| 'disabled'
+	| 'cycle_marked_paid'
+	| 'cycle_marked_unpaid'
+	| 'cycle_amount_changed'
+	| 'cycle_notes_changed';
+
+export interface BillEvent {
+	id: number;
+	bill_id: number;
+	event_type: BillEventType;
+	cycle_start_date: string | null;
+	changes: Record<string, unknown> | null;
+	created_at: string;
+}
+
+export interface BillEventListResponse {
+	bill_id: number;
+	total: number;
+	events: BillEvent[];
+}
+
 export interface BillHistoryResponse {
 	bill_id: number;
 	total: number;

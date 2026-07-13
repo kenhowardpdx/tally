@@ -42,6 +42,18 @@ resource "aws_lambda_function" "backend" {
   source_code_hash = local.backend_zip_hash
   role             = aws_iam_role.lambda_exec.arn
 
+  # AWS defaults (3s timeout, 128MB memory) are too tight for a cold start:
+  # importing FastAPI/SQLAlchemy/asyncpg plus Neon's own compute waking from
+  # scale-to-zero suspend routinely takes longer than 3s, and API Gateway
+  # surfaces that Lambda execution error as a 502 to the client. More memory
+  # also means more CPU during init (Lambda allocates CPU proportional to
+  # memory), which shortens the cold start itself, not just tolerates it.
+  # Still well within the free tier's 400,000 GB-seconds/month at this
+  # request volume - no provisioned concurrency, which is the actual
+  # cold-start elimination fix but costs a flat monthly fee even when idle.
+  timeout     = 15
+  memory_size = 512
+
   environment {
     variables = {
       DATABASE_URL_READWRITE = var.database_url_readwrite

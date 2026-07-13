@@ -99,8 +99,14 @@ export interface ForecastRequest {
 export interface ForecastBillLine {
 	bill_id: number;
 	name: string;
+	// The amount actually used in the running balance - the cycle override's
+	// amount if one is set, else the same as forecasted_amount_cents.
 	amount_cents: number;
+	// The bill's own configured amount, regardless of any override.
+	forecasted_amount_cents: number;
 	due_date: string;
+	completed: boolean;
+	notes: string | null;
 }
 
 export interface ForecastTransactionLine {
@@ -114,7 +120,50 @@ export interface ForecastWindfallLine {
 	windfall_id: number;
 	name: string;
 	amount_cents: number;
+	forecasted_amount_cents: number;
 	expected_date: string;
+	completed: boolean;
+	notes: string | null;
+}
+
+export interface CycleOverrideInput {
+	account_id: number;
+	bill_id?: number | null;
+	windfall_id?: number | null;
+	cycle_start_date: string;
+	completed: boolean;
+	override_amount_cents?: number | null;
+	notes?: string | null;
+}
+
+export interface BillHistoryEntry {
+	cycle_start_date: string;
+	cycle_end_date: string;
+	due_date: string;
+	expected_amount_cents: number;
+	actual_amount_cents: number;
+	completed: boolean;
+	notes: string | null;
+	variance_cents: number;
+}
+
+export interface BillHistoryResponse {
+	bill_id: number;
+	total: number;
+	entries: BillHistoryEntry[];
+}
+
+export interface CycleOverride {
+	id: number;
+	account_id: number;
+	bill_id: number | null;
+	windfall_id: number | null;
+	cycle_start_date: string;
+	completed: boolean;
+	override_amount_cents: number | null;
+	notes: string | null;
+	created_at: string;
+	updated_at: string;
 }
 
 export interface ForecastCycle {

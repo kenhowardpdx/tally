@@ -1,7 +1,7 @@
 # Tally Project Makefile
 # This Makefile provides common development tasks and GitHub Actions testing
 
-.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-login aws-creds clean-terraform
+.PHONY: help github_workflow_terraform-pr github_workflow_ci aws-login aws-creds clean-terraform analytics-report
 
 # Default target
 help: ## Show this help message
@@ -96,3 +96,8 @@ uninstall-git-hooks: ## Remove git hooks
 clean-terraform: ## Remove Terraform local state and cache
 	rm -rf infra/.terraform infra/.terraform.lock.hcl infra/backend.conf infra/plan.txt infra/tfplan
 	echo "Terraform local state and cache cleaned."
+
+# Analytics
+analytics-report: ## Print local usage-metrics summary (MAU/DAU/stale accounts, see docs/ANALYTICS.md)
+	@[ -f .secrets ] || { echo "Error: .secrets file required (see .secrets.example)"; exit 1; }
+	@set -a && . ./.secrets && set +a && poetry -C backend run python scripts/analytics/report.py

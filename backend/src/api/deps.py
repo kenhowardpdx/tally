@@ -1,13 +1,35 @@
-from fastapi import Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.auth import get_current_user
 from src.core.database import get_db
-from src.models import BankAccount, User
+from src.models import BankAccount, User, UserDailyActivity
+
+# Throttle for last_active_at/user_daily_activity writes - avoids a write on
+# every single authenticated request while still giving MAU/DAU/stale-account
+# queries hour-granularity freshness.
+_ACTIVITY_THROTTLE = timedelta(hours=1)
+
+
+async def _record_activity(user: User, db: AsyncSession) -> None:
+    now = datetime.now(timezone.utc)
+    if user.last_active_at is not None and now - user.last_active_at < _ACTIVITY_THROTTLE:
+        return
+    user.last_active_at = now
+    await db.execute(
+        insert(UserDailyActivity)
+        .values(user_id=user.id, activity_date=now.date())
+        .on_conflict_do_nothing(index_elements=["user_id", "activity_date"])
+    )
+    await db.commit()
 
 
 async def get_current_db_user(
+    request: Request,
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -19,13 +41,18 @@ async def get_current_db_user(
     auth0_sub = claims["sub"]
     result = await db.execute(select(User).where(User.auth0_sub == auth0_sub))
     user = result.scalar_one_or_none()
-    if user is not None:
-        return user
 
-    user = User(auth0_sub=auth0_sub, email=claims.get("email"))
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    if user is None:
+        user = User(auth0_sub=auth0_sub, email=claims.get("email"))
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    await _record_activity(user, db)
+    # Read by log_requests (backend/src/core/logging.py) after the route
+    # handler returns, so the access log can attribute a request to a user
+    # without a second JWT decode in the middleware.
+    request.state.user_id = user.id
     return user
 
 

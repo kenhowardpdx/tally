@@ -6,7 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
+  validate-actions:
+    name: Validate Actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: ./scripts/validate-actions.sh
+
   # IMPORTANT: "backend-test" and "frontend-test" are required status checks for PRs
   # Do not rename these jobs without updating branch protection rules
   backend-test:
@@ -31,18 +45,24 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+      - name: Install Poetry
+        run: pip install poetry
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
+      - name: Lint
+        run: |
+          poetry install --all-extras
+          poetry run ruff check .
       - name: Test
         env:
           DATABASE_URL_READWRITE: postgresql+asyncpg://tally:tally@localhost:5432/tally
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry install --all-extras
-          poetry run pytest
+        run: poetry run pytest
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -51,11 +71,17 @@ jobs:
         working-directory: ./frontend
 
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ./frontend/.nvmrc
-      - name: Test
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install
+        run: yarn install --frozen-lockfile
+      - name: Lint
+        run: yarn lint
+      - name: Check & Test
         env:
           # Dummy but present: svelte-kit sync generates $env/static/public's
           # ambient types from whatever env vars actually exist at sync time,
@@ -69,6 +95,5 @@ jobs:
           PUBLIC_API_BASE_URL: http://localhost:8000
           PUBLIC_DEV_AUTH_BYPASS: "false"
         run: |
-          yarn install --frozen-lockfile
           yarn run check
           yarn test

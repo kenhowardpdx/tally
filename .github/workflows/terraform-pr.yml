@@ -16,11 +16,11 @@ jobs:
       run:
         working-directory: infra
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check for infra changes
         id: infra_changes
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const files = await github.paginate(
@@ -37,6 +37,16 @@ jobs:
         if: steps.infra_changes.outputs.noop == 'true'
         run: echo "No infra changes detected. Skipping Terraform steps."
 
+      - name: Security Scan
+        if: steps.infra_changes.outputs.noop != 'true'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: infra/.trivyignore
+
       - uses: aws-actions/configure-aws-credentials@v6
         if: steps.infra_changes.outputs.noop != 'true'
         with:
@@ -48,7 +58,7 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: steps.infra_changes.outputs.noop != 'true'
         with:
           path: .terraform
@@ -89,7 +99,7 @@ jobs:
 
       - name: Comment
         if: github.event_name == 'pull_request' && steps.plan.outputs.exit_code != '0'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');

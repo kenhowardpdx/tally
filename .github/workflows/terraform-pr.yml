@@ -20,7 +20,7 @@ jobs:
 
       - name: Check for infra changes
         id: infra_changes
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const files = await github.paginate(
@@ -99,7 +99,7 @@ jobs:
 
       - name: Comment
         if: github.event_name == 'pull_request' && steps.plan.outputs.exit_code != '0'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');

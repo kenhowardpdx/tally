@@ -32,6 +32,9 @@ A multi-user bill-tracking and forecasting app, evolved from
     starting balance, income per cycle, start date, and cycle type in effect for any
     past cycle, as a true point-in-time snapshot — reconstructable even after a bill
     has since been deleted
+13. Export a forecast in a form suited to pasting into an LLM (e.g. Claude.ai) for
+    analysis — Ken's specific case is getting feedback on a student loan payoff
+    strategy against the forecasted cash flow
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -679,6 +682,32 @@ simpler) rather than derived after the fact from data that may no longer exist.
 - [ ] Frontend: a historical cycle view surfacing the snapshot, including bills that no
       longer exist in the live `bills` table.
 
+## Phase 8 — Forecast export
+
+**Status**: not started - deferred, captured per Ken's request.
+
+Vision item 13. Ken's stated use case: export a forecast, paste it into Claude.ai, and
+get analysis on a savings strategy for paying down student loan debt. That's a
+readability-for-an-LLM problem more than a spreadsheet-interchange one (contrast with
+the bills CSV export, Phase 1.8, which is specifically for round-tripping through
+Excel/Numbers) - the export should read like a forecast, not like a database dump.
+
+`ForecastResponse` (`backend/src/schemas/forecast.py`) already has everything an export
+would need: per-cycle bills/transactions/windfalls, `net_cents`, `running_balance_cents`,
+starting/ending balance, unscheduled bills. This is a formatting/transport problem, not a
+data-availability one.
+
+- [ ] Pick a format: plain text or Markdown (a running-balance table per cycle, reads
+      naturally when pasted into a chat) vs. CSV (matches the Phase 1.8 precedent
+      structurally, but a raw spreadsheet dump is a worse fit for "paste into an LLM
+      and ask for analysis" than a human-readable table would be) - not yet decided.
+- [ ] Backend: an export endpoint alongside the existing forecast computation
+      (`backend/src/api/forecast.py`), following the `/export` pattern already
+      established for bills (`backend/src/api/bills.py`).
+- [ ] Frontend: an "Export" action on the forecast page
+      (`frontend/src/routes/(app)/accounts/[id]/forecast/+page.svelte`), matching the
+      existing bills-export download pattern.
+
 ## Legacy GitHub Project issue crosswalk
 
 Use this when closing the old project-management issues so their intent stays visible here:
@@ -935,3 +964,9 @@ session (or a fresh Claude Code instance) orient in under a minute.
   token cache; `initAuth()` now attempts a silent SSO check via `getTokenSilently()`
   before falling back to logged-out). Next: Phase 5's remaining items, Phase 7 whenever
   it's time, or any newly-discovered polish item.
+- 2026-07-13: Added Vision item 13 and Phase 8 (forecast export - Ken's use case is
+  pasting a forecast into Claude.ai for feedback on a student loan payoff strategy, so
+  the output should read like a forecast, not a spreadsheet dump; format not yet
+  decided between plain text/Markdown and CSV). Not started, captured here per Ken's
+  request. Next: Phase 5's remaining items, Phase 7/8 whenever it's time, or any
+  newly-discovered polish item.

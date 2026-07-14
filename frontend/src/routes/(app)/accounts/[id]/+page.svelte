@@ -12,6 +12,7 @@
 	} from '$lib/api/bills';
 	import { ApiError } from '$lib/api';
 	import type { BankAccount, Bill, RecurrenceType } from '$lib/api/types';
+	import { accountSuffix } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -277,7 +278,7 @@
 <AccountNav {accountId} current="bills" />
 <div class="mt-2 flex items-center justify-between">
 	<h1 class="text-2xl font-semibold text-text">
-		Bills{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+		Bills{accountSuffix(account)}
 	</h1>
 	<div class="flex gap-2">
 		<input

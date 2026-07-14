@@ -35,7 +35,7 @@ jobs:
         working-directory: ./infra
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: ./infra/.terraform
           key: terraform-${{ hashFiles('./infra/.terraform.lock.hcl') }}

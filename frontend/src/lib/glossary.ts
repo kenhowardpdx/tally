@@ -51,5 +51,15 @@ export const glossaryTerms: GlossaryTerm[] = [
 		term: 'Bill history',
 		definition:
 			"A cycle-by-cycle log of a single bill's expected vs. actual amounts, completion, and notes over time - useful for spotting bills that consistently run over their usual amount."
+	},
+	{
+		term: 'One-time bill',
+		definition:
+			'A bill whose start date and end date are the same day only ever occurs once - functionally identical to a one-off Transaction, but modeled as a recurring Bill. Consider deleting it and recording the expense as a Transaction instead, since Bills are meant for things that repeat.'
+	},
+	{
+		term: 'Ended bill',
+		definition:
+			"A bill whose end date has passed - it no longer applies to any forecast cycle. Tally automatically disables it so it's easy to review and delete during cleanup, rather than leaving it enabled but functionally dead."
 	}
 ];

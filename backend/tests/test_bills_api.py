@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import pytest
 from httpx import AsyncClient
 
@@ -117,6 +119,59 @@ async def test_toggle_bill_enabled(client: AsyncClient):
     )
     assert res.status_code == 200
     assert res.json()["enabled"] is False
+
+
+async def test_bill_past_end_date_auto_disabled_on_list(client: AsyncClient):
+    account = await _create_account(client)
+    past_end_date = date.today() - timedelta(days=1)
+    bill = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/bills",
+            json=_bill_payload(end_date=past_end_date.isoformat()),
+        )
+    ).json()
+    assert bill["enabled"] is True
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.status_code == 200
+    assert res.json()[0]["enabled"] is False
+
+    events_res = await client.get(f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events")
+    event_types = [e["event_type"] for e in events_res.json()["events"]]
+    assert event_types == ["disabled", "created"]
+
+
+async def test_bill_future_end_date_stays_enabled_on_list(client: AsyncClient):
+    account = await _create_account(client)
+    future_end_date = date.today() + timedelta(days=1)
+    bill = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/bills",
+            json=_bill_payload(end_date=future_end_date.isoformat()),
+        )
+    ).json()
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.json()[0]["enabled"] is True
+    assert bill["enabled"] is True
+
+
+async def test_manually_disabled_bill_past_end_date_not_double_flagged(client: AsyncClient):
+    account = await _create_account(client)
+    past_end_date = date.today() - timedelta(days=1)
+    bill = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/bills",
+            json=_bill_payload(end_date=past_end_date.isoformat(), enabled=False),
+        )
+    ).json()
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/bills")
+    assert res.json()[0]["enabled"] is False
+
+    events_res = await client.get(f"/api/v1/accounts/{account['id']}/bills/{bill['id']}/events")
+    event_types = [e["event_type"] for e in events_res.json()["events"]]
+    assert event_types == ["created"]
 
 
 async def test_delete_bill(client: AsyncClient):

@@ -12,7 +12,7 @@
 	} from '$lib/api/bills';
 	import { ApiError } from '$lib/api';
 	import type { BankAccount, Bill, RecurrenceType } from '$lib/api/types';
-	import { accountSuffix } from '$lib/format';
+	import { accountSuffix, todayIso } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -21,13 +21,26 @@
 	import Input from '$lib/components/Input.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import RecurrenceConfigFields from '$lib/components/RecurrenceConfigFields.svelte';
+	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { glossaryTerms } from '$lib/glossary';
 	import { recurrenceLabels } from '$lib/recurrence';
 	import { onMount } from 'svelte';
 
 	const frequencyTooltip = glossaryTerms.find((t) => t.term === 'Frequency')!.definition;
+	const oneTimeTooltip = glossaryTerms.find((t) => t.term === 'One-time bill')!.definition;
+	const endedTooltip = glossaryTerms.find((t) => t.term === 'Ended bill')!.definition;
+	const today = todayIso();
+
+	function isOneTimeBill(bill: Bill): boolean {
+		return bill.end_date !== null && bill.start_date === bill.end_date;
+	}
+
+	function isEndedBill(bill: Bill): boolean {
+		return bill.end_date !== null && bill.end_date < today;
+	}
 
 	const accountId = $derived(Number($page.params.id));
 
@@ -350,7 +363,27 @@
 			<tbody>
 				{#each bills as bill (bill.id)}
 					<tr class="border-b border-slate-100 last:border-0">
-						<td class="px-4 py-2">{bill.name}</td>
+						<td class="px-4 py-2">
+							<div class="flex flex-wrap items-center gap-1.5">
+								<span>{bill.name}</span>
+								{#if isOneTimeBill(bill)}
+									<span
+										class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+									>
+										One-time
+										<Tooltip text={oneTimeTooltip} />
+									</span>
+								{/if}
+								{#if isEndedBill(bill)}
+									<span
+										class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+									>
+										Ended
+										<Tooltip text={endedTooltip} />
+									</span>
+								{/if}
+							</div>
+						</td>
 						<td class="px-4 py-2">{formatAmount(bill.amount_cents)}</td>
 						<td class="px-4 py-2 text-slate-600">{recurrenceLabels[bill.recurrence_type]}</td>
 						<td class="px-4 py-2">
@@ -366,9 +399,14 @@
 								>
 									History
 								</a>
-								<Button variant="secondary" onclick={() => openEditModal(bill)}>Edit</Button>
-								<Button variant="secondary" onclick={() => openMoveModal(bill)}>Move</Button>
-								<Button variant="danger" onclick={() => handleDelete(bill.id)}>Delete</Button>
+								<RowActionsMenu
+									label="Bill actions"
+									actions={[
+										{ label: 'Edit', onclick: () => openEditModal(bill) },
+										{ label: 'Move', onclick: () => openMoveModal(bill) },
+										{ label: 'Delete', onclick: () => handleDelete(bill.id), variant: 'danger' }
+									]}
+								/>
 							</div>
 						</td>
 					</tr>

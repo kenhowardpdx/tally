@@ -26,6 +26,7 @@ class TransactionUpdate(BaseModel):
     date: date_ | None = None
     description: str | None = None
     bill_id: int | None = None
+    account_id: int | None = None
 
 
 class TransactionRead(BaseModel):

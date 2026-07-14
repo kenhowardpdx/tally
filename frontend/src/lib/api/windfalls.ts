@@ -12,6 +12,17 @@ export function createWindfall(accountId: number, input: WindfallInput): Promise
 	});
 }
 
+export function updateWindfall(
+	accountId: number,
+	windfallId: number,
+	input: Partial<WindfallInput> & { account_id?: number }
+): Promise<Windfall> {
+	return apiJson(`/api/v1/accounts/${accountId}/windfalls/${windfallId}`, {
+		method: 'PATCH',
+		body: JSON.stringify(input)
+	});
+}
+
 export function deleteWindfall(accountId: number, windfallId: number): Promise<void> {
 	return apiJson(`/api/v1/accounts/${accountId}/windfalls/${windfallId}`, {
 		method: 'DELETE'

@@ -14,6 +14,7 @@ class WindfallUpdate(BaseModel):
     name: str | None = None
     amount_cents: int | None = Field(default=None, gt=0)
     expected_date: date | None = None
+    account_id: int | None = None
 
 
 class WindfallRead(BaseModel):

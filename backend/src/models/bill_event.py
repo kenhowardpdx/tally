@@ -1,5 +1,6 @@
 import enum
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -7,8 +8,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
 
+if TYPE_CHECKING:
+    from src.models.bill import Bill
 
-class BillEventType(str, enum.Enum):
+
+class BillEventType(enum.StrEnum):
     CREATED = "created"
     UPDATED = "updated"
     NOTES_CHANGED = "notes_changed"

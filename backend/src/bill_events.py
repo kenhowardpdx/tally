@@ -40,6 +40,16 @@ def created_event(bill: Bill) -> BillEvent:
     )
 
 
+def expired_event(bill: Bill) -> BillEvent:
+    """Bill auto-disabled because its end_date has passed (see
+    _auto_disable_expired in src/api/bills.py) - a plain DISABLED event, same
+    as a manual toggle, since there's no per-field diff to show and the
+    timeline already labels every DISABLED event the same way regardless of
+    cause.
+    """
+    return BillEvent(account_id=bill.account_id, bill_id=bill.id, event_type=BillEventType.DISABLED)
+
+
 def update_events(
     bill: Bill, update_data: dict[str, Any], before: dict[str, Any]
 ) -> list[BillEvent]:

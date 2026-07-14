@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
-from src.bill_events import TRACKED_BILL_FIELDS, created_event, update_events
+from src.bill_events import TRACKED_BILL_FIELDS, created_event, expired_event, update_events
 from src.bills_csv import bills_to_csv, parse_csv_rows
 from src.core.database import get_db
 from src.forecast import ForecastBill, ForecastCycleOverride, build_bill_history, last_cycle_end
@@ -39,13 +39,40 @@ async def _get_owned_bill(
     return bill
 
 
+async def _auto_disable_expired(db: AsyncSession, bills: list[Bill]) -> None:
+    """A bill whose end_date has passed is functionally dead - no forecast
+    cycle will ever include it again - but was otherwise left enabled
+    indefinitely with no cron/scheduler to catch it (this app has none, by
+    design - see CLAUDE.md's cost-first philosophy). Disabling it lazily,
+    the next time bills are listed, flags it via the existing Enabled/
+    Disabled badge without needing a background job.
+    """
+    today = date.today()
+    expired = [
+        bill for bill in bills if bill.enabled and bill.end_date is not None and bill.end_date < today
+    ]
+    if not expired:
+        return
+    for bill in expired:
+        bill.enabled = False
+    db.add_all(expired_event(bill) for bill in expired)
+    await db.commit()
+    # updated_at's onupdate=func.now() is server-computed - without a
+    # refresh, the response would try to lazy-load it outside any awaited
+    # context (Pydantic serialization happens after the endpoint returns).
+    for bill in expired:
+        await db.refresh(bill)
+
+
 @router.get("", response_model=list[BillRead])
 async def list_bills(
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
 ) -> list[Bill]:
     result = await db.execute(select(Bill).where(Bill.account_id == account.id))
-    return list(result.scalars().all())
+    bills = list(result.scalars().all())
+    await _auto_disable_expired(db, bills)
+    return bills
 
 
 @router.post("", response_model=BillRead, status_code=status.HTTP_201_CREATED)

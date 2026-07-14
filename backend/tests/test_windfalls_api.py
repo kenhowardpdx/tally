@@ -77,6 +77,47 @@ async def test_update_windfall(client: AsyncClient):
     assert res.json()["amount_cents"] == 75000
 
 
+async def test_move_windfall_to_another_owned_account(client: AsyncClient):
+    account_a = await _create_account(client)
+    account_b = (await client.post("/api/v1/accounts", json={"name": "Savings"})).json()
+    windfall = (
+        await client.post(
+            f"/api/v1/accounts/{account_a['id']}/windfalls", json=_windfall_payload()
+        )
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account_a['id']}/windfalls/{windfall['id']}",
+        json={"account_id": account_b["id"]},
+    )
+    assert res.status_code == 200
+    assert res.json()["account_id"] == account_b["id"]
+
+    res = await client.get(f"/api/v1/accounts/{account_a['id']}/windfalls")
+    assert res.json() == []
+    res = await client.get(f"/api/v1/accounts/{account_b['id']}/windfalls")
+    assert len(res.json()) == 1
+
+
+async def test_cannot_move_windfall_to_another_users_account(client: AsyncClient):
+    account = await _create_account(client)
+    windfall = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/windfalls", json=_windfall_payload()
+        )
+    ).json()
+
+    _login_as("auth0|someone-else")
+    other_account = (await client.post("/api/v1/accounts", json={"name": "Their account"})).json()
+    _login_as("auth0|owner")
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/windfalls/{windfall['id']}",
+        json={"account_id": other_account["id"]},
+    )
+    assert res.status_code == 404
+
+
 async def test_update_windfall_rejects_explicit_null_on_required_field(client: AsyncClient):
     account = await _create_account(client)
     windfall = (

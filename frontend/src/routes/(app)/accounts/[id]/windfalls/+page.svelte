@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { getAccount } from '$lib/api/accounts';
-	import { createWindfall, deleteWindfall, listWindfalls } from '$lib/api/windfalls';
+	import { getAccount, listAccounts } from '$lib/api/accounts';
+	import { createWindfall, deleteWindfall, listWindfalls, updateWindfall } from '$lib/api/windfalls';
 	import type { BankAccount, Windfall } from '$lib/api/types';
 	import { accountSuffix } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
@@ -9,6 +9,9 @@
 	import Card from '$lib/components/Card.svelte';
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
+	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { glossaryTerms } from '$lib/glossary';
@@ -19,6 +22,7 @@
 	const accountId = $derived(Number($page.params.id));
 
 	let account = $state<BankAccount | null>(null);
+	let accounts = $state<BankAccount[]>([]);
 	let windfalls = $state<Windfall[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
@@ -28,14 +32,35 @@
 	let expectedDate = $state('');
 	let creating = $state(false);
 
-	async function load() {
+	let editingWindfall = $state<Windfall | null>(null);
+	let editName = $state('');
+	let editAmount = $state('');
+	let editExpectedDate = $state('');
+	let saving = $state(false);
+	let showEditModal = $state(false);
+
+	let movingWindfall = $state<Windfall | null>(null);
+	let moveTargetAccountId = $state('');
+	let moving = $state(false);
+	let showMoveModal = $state(false);
+
+	// Account details and the accounts list (for the move-windfall picker)
+	// only change when navigating here or moving a windfall elsewhere
+	// entirely - they don't need refetching after every create/delete,
+	// unlike windfalls itself.
+	async function loadContext() {
+		try {
+			[account, accounts] = await Promise.all([getAccount(accountId), listAccounts()]);
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function loadWindfalls() {
 		loading = true;
 		error = null;
 		try {
-			[account, windfalls] = await Promise.all([
-				getAccount(accountId),
-				listWindfalls(accountId)
-			]);
+			windfalls = await listWindfalls(accountId);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -43,7 +68,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		loadContext();
+		loadWindfalls();
+	});
 
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
@@ -66,7 +94,7 @@
 			name = '';
 			amount = '';
 			expectedDate = '';
-			await load();
+			await loadWindfalls();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -77,9 +105,68 @@
 	async function handleDelete(windfallId: number) {
 		try {
 			await deleteWindfall(accountId, windfallId);
-			await load();
+			await loadWindfalls();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	function openEditModal(windfall: Windfall) {
+		editingWindfall = windfall;
+		editName = windfall.name;
+		editAmount = (windfall.amount_cents / 100).toString();
+		editExpectedDate = windfall.expected_date;
+		showEditModal = true;
+	}
+
+	async function handleEditSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		if (!editingWindfall) return;
+		const amountCents = Math.round(Number(editAmount) * 100);
+		if (!editName.trim() || !editExpectedDate || Number.isNaN(amountCents) || amountCents <= 0) {
+			error = !editExpectedDate
+				? 'Please choose an expected date.'
+				: amountCents <= 0
+					? 'Amount must be greater than zero.'
+					: 'Please fill out all fields.';
+			return;
+		}
+		saving = true;
+		try {
+			await updateWindfall(accountId, editingWindfall.id, {
+				name: editName,
+				amount_cents: amountCents,
+				expected_date: editExpectedDate
+			});
+			showEditModal = false;
+			await loadWindfalls();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
+		}
+	}
+
+	function openMoveModal(windfall: Windfall) {
+		movingWindfall = windfall;
+		moveTargetAccountId = '';
+		showMoveModal = true;
+	}
+
+	async function handleMove(event: SubmitEvent) {
+		event.preventDefault();
+		if (!movingWindfall || !moveTargetAccountId) return;
+		moving = true;
+		try {
+			await updateWindfall(accountId, movingWindfall.id, {
+				account_id: Number(moveTargetAccountId)
+			});
+			showMoveModal = false;
+			await loadWindfalls();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			moving = false;
 		}
 	}
 
@@ -138,7 +225,14 @@
 							{formatAmount(windfall.amount_cents)}
 						</td>
 						<td class="px-4 py-2 text-right">
-							<Button variant="danger" onclick={() => handleDelete(windfall.id)}>Delete</Button>
+							<RowActionsMenu
+								label="Windfall actions"
+								actions={[
+									{ label: 'Edit', onclick: () => openEditModal(windfall) },
+									{ label: 'Move', onclick: () => openMoveModal(windfall) },
+									{ label: 'Delete', onclick: () => handleDelete(windfall.id), variant: 'danger' }
+								]}
+							/>
 						</td>
 					</tr>
 				{/each}
@@ -146,3 +240,42 @@
 		</Table>
 	{/if}
 </div>
+
+<Modal bind:open={showMoveModal} title="Move windfall">
+	{#if movingWindfall}
+		<form class="flex flex-col gap-4" onsubmit={handleMove}>
+			<p class="text-sm text-slate-600">
+				Move <span class="font-medium text-text">{movingWindfall.name}</span> to a different account.
+			</p>
+			<Select
+				label="Account"
+				bind:value={moveTargetAccountId}
+				options={accounts
+					.filter((a) => a.id !== accountId)
+					.map((target) => ({ value: String(target.id), label: target.name }))}
+			/>
+			<div class="flex justify-end gap-2">
+				<Button variant="secondary" type="button" onclick={() => (showMoveModal = false)}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={moving || !moveTargetAccountId}>Move</Button>
+			</div>
+		</form>
+	{/if}
+</Modal>
+
+<Modal bind:open={showEditModal} title="Edit windfall">
+	{#if editingWindfall}
+		<form class="flex flex-col gap-4" onsubmit={handleEditSubmit}>
+			<Input label="Name" bind:value={editName} required />
+			<Input label="Amount ($)" type="number" step="0.01" bind:value={editAmount} required />
+			<DatePicker label="Expected date" bind:value={editExpectedDate} />
+			<div class="flex justify-end gap-2">
+				<Button variant="secondary" type="button" onclick={() => (showEditModal = false)}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={saving}>Save</Button>
+			</div>
+		</form>
+	{/if}
+</Modal>

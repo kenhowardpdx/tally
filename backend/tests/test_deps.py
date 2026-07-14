@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -66,11 +66,11 @@ async def test_request_after_throttle_window_records_again(
     user = await _get_user(db_session, "auth0|activity_user")
 
     # Simulate the hourly throttle window having elapsed.
-    user.last_active_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    user.last_active_at = datetime.now(UTC) - timedelta(hours=2)
     await db_session.commit()
 
     await client.get("/api/v1/me/consent")
     db_session.expire_all()
     user = await _get_user(db_session, "auth0|activity_user")
-    assert user.last_active_at > datetime.now(timezone.utc) - timedelta(minutes=1)
+    assert user.last_active_at > datetime.now(UTC) - timedelta(minutes=1)
     assert len(await _daily_activity_rows(db_session, user.id)) == 1

@@ -21,7 +21,7 @@ Tally is a financial application for managing recurring bills and forecasting ba
    Development](#local-application-development) below)
 3. Start Docker and run `docker compose up -d`
 4. Apply database migrations: `cd backend && poetry run alembic upgrade head`
-5. Run tests: `cd backend && poetry run pytest` (frontend has no test suite yet)
+5. Run tests: `cd backend && poetry run pytest` and `cd frontend && yarn test`
 
 Steps 3-5 are only needed once (and again whenever new migrations land). Everything past this
 point — Terraform, AWS SSO, and `act` — is for infrastructure/CI work, not day-to-day app

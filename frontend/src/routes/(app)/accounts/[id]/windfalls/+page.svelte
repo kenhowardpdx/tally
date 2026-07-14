@@ -89,7 +89,7 @@
 
 <AccountNav {accountId} current="windfalls" />
 <h1 class="mt-2 flex items-center text-2xl font-semibold text-text">
-	Windfalls{#if account}{' '}({account.name}{#if account.institution}{' '}- {account.institution}{/if}){/if}
+	Windfalls{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
 	<Tooltip text={windfallTooltip} />
 </h1>
 

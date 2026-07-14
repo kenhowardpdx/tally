@@ -1,0 +1,13 @@
+# Deliberate cost-vs-security tradeoffs for a solo-developer, free-tier-first
+# project (see CLAUDE.md's Cost Management Philosophy) - not oversights.
+
+# S3 buckets use SSE-S3 (AES256, free) instead of SSE-KMS with a customer-
+# managed key (~$1/month/key + per-request charges). AES256 already encrypts
+# data at rest; a CMK only adds key-rotation/audit control this project has
+# no requirement for.
+AVD-AWS-0132
+
+# CloudFront has no AWS WAF in front of it (~$5-6/month base + per-rule +
+# per-request charges) - not justified for a low-traffic personal finance
+# app's static frontend distribution.
+AVD-AWS-0011

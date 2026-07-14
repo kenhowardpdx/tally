@@ -1,13 +1,21 @@
 import enum
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Date, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
 
+if TYPE_CHECKING:
+    from src.models.bill import Bill
+    from src.models.cycle_override import CycleOverride
+    from src.models.transaction import Transaction
+    from src.models.user import User
+    from src.models.windfall import Windfall
 
-class CycleType(str, enum.Enum):
+
+class CycleType(enum.StrEnum):
     WEEKLY = "weekly"
     BIWEEKLY = "biweekly"
     MONTHLY = "monthly"

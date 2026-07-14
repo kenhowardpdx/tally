@@ -19,7 +19,7 @@ test_engine = create_async_engine(settings.database_url_readwrite, poolclass=Nul
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _schema() -> AsyncGenerator[None, None]:
+async def _schema() -> AsyncGenerator[None]:
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -28,7 +28,7 @@ async def _schema() -> AsyncGenerator[None, None]:
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session() -> AsyncGenerator[AsyncSession]:
     # Each test runs inside an outer transaction that's rolled back at
     # teardown, even though route handlers call db.commit() themselves -
     # join_transaction_mode="create_savepoint" turns those commits into
@@ -49,8 +49,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db

@@ -1,5 +1,6 @@
 import enum
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum, ForeignKey, String, func, text, true
 from sqlalchemy.dialects.postgresql import JSONB
@@ -7,8 +8,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
 
+if TYPE_CHECKING:
+    from src.models.bank_account import BankAccount
+    from src.models.bill_event import BillEvent
+    from src.models.cycle_override import CycleOverride
+    from src.models.transaction import Transaction
 
-class RecurrenceType(str, enum.Enum):
+
+class RecurrenceType(enum.StrEnum):
     WEEKLY = "weekly"
     BIWEEKLY = "biweekly"
     SEMIMONTHLY = "semimonthly"

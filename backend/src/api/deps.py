@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -16,7 +16,7 @@ _ACTIVITY_THROTTLE = timedelta(hours=1)
 
 
 async def _record_activity(user: User, db: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if user.last_active_at is not None and now - user.last_active_at < _ACTIVITY_THROTTLE:
         return
     user.last_active_at = now

@@ -56,6 +56,22 @@ export async function initAuth(): Promise<void> {
 			const { appState } = await auth0.handleRedirectCallback();
 			window.history.replaceState({}, document.title, window.location.pathname);
 			if (appState?.redirectTo) await goto(appState.redirectTo);
+		} else {
+			// The client only caches tokens in memory (no cacheLocation override),
+			// so that cache is empty on every fresh page load. Without this, only
+			// routes with their own login()-on-unauthenticated guard (e.g. the
+			// (app) layout) end up re-authenticated, via a full loginWithRedirect
+			// round trip - and only because Auth0's SSO cookie lets it return
+			// silently. This does the same SSO check up front, via a hidden
+			// iframe instead of a full-page redirect, so every route (including
+			// the logged-out-looking "/" marketing page) picks up an existing
+			// session without a visible flash.
+			try {
+				await auth0.getTokenSilently();
+			} catch {
+				// No active Auth0 session (or it's expired/requires interaction) -
+				// genuinely logged out; isAuthenticated() below will reflect that.
+			}
 		}
 
 		const authenticated = await auth0.isAuthenticated();

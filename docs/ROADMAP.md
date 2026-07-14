@@ -28,6 +28,10 @@ A multi-user bill-tracking and forecasting app, evolved from
    USD)
 10. Notes support on bills and per-cycle override snapshots (for reconciliation context)
 11. A bill history view showing forecasted vs actual outcomes across prior cycles
+12. A historical cycle view: the full set of bills/transactions/windfalls plus the
+    starting balance, income per cycle, start date, and cycle type in effect for any
+    past cycle, as a true point-in-time snapshot — reconstructable even after a bill
+    has since been deleted
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -647,6 +651,34 @@ AWS-hosted, admin-only dashboard is an explicit follow-up, not part of this pass
       - not yet queried; would join against each feature's table via `bank_accounts.user_id`
       rather than `user_daily_activity`.
 
+## Phase 7 — Historical cycle snapshots
+
+**Status**: not started - deferred by explicit request (Ken: "I don't want to build this
+feature now, but soon"). Captured here so the ask isn't lost across the usual ~6-week gap.
+
+Vision item 12. Distinct from the existing bill history view (Phase 3.10-3.13): that
+feature is per-bill, and answers "how did this one bill do across past cycles" from
+live `cycle_overrides`/`bill_events` rows. This is per-*cycle*, account-wide, and asks a
+different question: "what did this whole cycle look like at the time" - every bill,
+transaction, and windfall that applied, together with the starting balance, income per
+cycle, start date, and cycle type that were in effect for that cycle specifically.
+
+The hard part: this needs to survive a bill being deleted afterward. Today, deleting a
+bill is a real hard delete that cascades away its `cycle_overrides` and `bill_events`
+rows too (`ondelete="CASCADE"` / `cascade="all, delete-orphan"` in
+`backend/src/models/bill.py`) - so nothing currently reconstructs a past cycle once one
+of its bills is gone. Querying the live tables differently won't do it; this needs an
+actual point-in-time snapshot mechanism decoupled from the live bill/transaction/windfall
+rows, written at the time each cycle closes (or lazily on first view, whichever proves
+simpler) rather than derived after the fact from data that may no longer exist.
+
+- [ ] Design the snapshot data model (what gets frozen, when it's written, how it's keyed
+      to `(account_id, cycle_start_date)`) - not yet designed.
+- [ ] Backend: write path (when/how a cycle's snapshot gets captured) and read path (an
+      endpoint returning a past cycle's full frozen state).
+- [ ] Frontend: a historical cycle view surfacing the snapshot, including bills that no
+      longer exist in the live `bills` table.
+
 ## Legacy GitHub Project issue crosswalk
 
 Use this when closing the old project-management issues so their intent stays visible here:
@@ -886,3 +918,20 @@ session (or a fresh Claude Code instance) orient in under a minute.
   three diffed events, and collapsed again without refetching. Next: Phase 5's
   remaining items, the local-dev/test DB isolation footgun, or any newly-discovered
   polish item.
+- 2026-07-13: Closed out the legacy GitHub Project issue set (#6-23) per the crosswalk
+  above - every one either shipped or was a documented decision, nothing left to port
+  into the roadmap that wasn't already here. Added Vision item 12 and Phase 7 (historical
+  cycle snapshots: full account-wide bill/transaction/windfall state plus the
+  starting-balance/income/cycle settings in effect for a given past cycle, surviving a
+  bill's later deletion) - explicitly deferred, not started, captured here per Ken's
+  request so it isn't lost. Also merged the full Dependabot backlog (20 PRs: patch/minor
+  bumps merged directly; fastapi 0.110->0.139, gunicorn 23->26, pytest-asyncio 0.24->1.4,
+  and pytest 8->9 each verified locally - full test suite + a real gunicorn boot for the
+  two runtime deps - before merging) and fixed two bugs: the account header spacing
+  regression from #104's eslint adoption (svelte/no-useless-mustaches flagged `{' '}` as
+  useless, but a literal space at an `{#if}` block edge gets trimmed by Svelte's
+  compiler - fixed via a shared `accountSuffix()` helper instead, see PR #124), and the
+  "/" marketing page not detecting an existing Auth0 session on reload (memory-only
+  token cache; `initAuth()` now attempts a silent SSO check via `getTokenSilently()`
+  before falling back to logged-out). Next: Phase 5's remaining items, Phase 7 whenever
+  it's time, or any newly-discovered polish item.

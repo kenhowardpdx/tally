@@ -18,7 +18,7 @@ jobs:
     name: Validate Actions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: ./scripts/validate-actions.sh
 
   # IMPORTANT: "backend-test" and "frontend-test" are required status checks for PRs
@@ -45,7 +45,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -71,7 +71,7 @@ jobs:
         working-directory: ./frontend
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version-file: ./frontend/.nvmrc

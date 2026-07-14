@@ -15,6 +15,17 @@ export function createTransaction(
 	});
 }
 
+export function updateTransaction(
+	accountId: number,
+	transactionId: number,
+	input: Partial<TransactionInput> & { account_id?: number }
+): Promise<Transaction> {
+	return apiJson(`/api/v1/accounts/${accountId}/transactions/${transactionId}`, {
+		method: 'PATCH',
+		body: JSON.stringify(input)
+	});
+}
+
 export function deleteTransaction(accountId: number, transactionId: number): Promise<void> {
 	return apiJson(`/api/v1/accounts/${accountId}/transactions/${transactionId}`, {
 		method: 'DELETE'

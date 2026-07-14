@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import get_owned_bank_account
+from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.core.database import get_db
-from src.models import BankAccount, Windfall
+from src.models import BankAccount, User, Windfall
 from src.schemas.windfall import WindfallCreate, WindfallRead, WindfallUpdate
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/windfalls", tags=["windfalls"])
@@ -70,9 +70,15 @@ async def update_windfall(
     payload: WindfallUpdate,
     db: AsyncSession = Depends(get_db),
     windfall: Windfall = Depends(_get_owned_windfall),
+    current_user: User = Depends(get_current_db_user),
 ) -> Windfall:
     update_data = payload.model_dump(exclude_unset=True)
     _reject_explicit_nulls(update_data)
+    if "account_id" in update_data:
+        # Moving to another account - the target must also belong to the
+        # current user, same as get_owned_bank_account already validated for
+        # the *current* account_id from the URL (mirrors Bill's move).
+        await get_bank_account_or_404(update_data["account_id"], db, current_user)
     for field, value in update_data.items():
         setattr(windfall, field, value)
     await db.commit()

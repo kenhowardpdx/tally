@@ -78,6 +78,47 @@ async def test_update_transaction(client: AsyncClient):
     assert res.json()["amount_cents"] == 500
 
 
+async def test_move_transaction_to_another_owned_account(client: AsyncClient):
+    account_a = await _create_account(client)
+    account_b = (await client.post("/api/v1/accounts", json={"name": "Savings"})).json()
+    transaction = (
+        await client.post(
+            f"/api/v1/accounts/{account_a['id']}/transactions", json=_transaction_payload()
+        )
+    ).json()
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account_a['id']}/transactions/{transaction['id']}",
+        json={"account_id": account_b["id"]},
+    )
+    assert res.status_code == 200
+    assert res.json()["account_id"] == account_b["id"]
+
+    res = await client.get(f"/api/v1/accounts/{account_a['id']}/transactions")
+    assert res.json() == []
+    res = await client.get(f"/api/v1/accounts/{account_b['id']}/transactions")
+    assert len(res.json()) == 1
+
+
+async def test_cannot_move_transaction_to_another_users_account(client: AsyncClient):
+    account = await _create_account(client)
+    transaction = (
+        await client.post(
+            f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload()
+        )
+    ).json()
+
+    _login_as("auth0|someone-else")
+    other_account = (await client.post("/api/v1/accounts", json={"name": "Their account"})).json()
+    _login_as("auth0|owner")
+
+    res = await client.patch(
+        f"/api/v1/accounts/{account['id']}/transactions/{transaction['id']}",
+        json={"account_id": other_account["id"]},
+    )
+    assert res.status_code == 404
+
+
 async def test_update_transaction_rejects_explicit_null_on_required_field(client: AsyncClient):
     account = await _create_account(client)
     transaction = (

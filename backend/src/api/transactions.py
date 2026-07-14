@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import get_owned_bank_account
+from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.core.database import get_db
-from src.models import BankAccount, Bill, Transaction
+from src.models import BankAccount, Bill, Transaction, User
 from src.schemas.transaction import TransactionCreate, TransactionRead, TransactionUpdate
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/transactions", tags=["transactions"])
@@ -83,9 +83,15 @@ async def update_transaction(
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
     transaction: Transaction = Depends(_get_owned_transaction),
+    current_user: User = Depends(get_current_db_user),
 ) -> Transaction:
     update_data = payload.model_dump(exclude_unset=True)
     _reject_explicit_nulls(update_data)
+    if "account_id" in update_data:
+        # Moving to another account - the target must also belong to the
+        # current user, same as get_owned_bank_account already validated for
+        # the *current* account_id from the URL (mirrors Bill's move).
+        await get_bank_account_or_404(update_data["account_id"], db, current_user)
     if "bill_id" in update_data:
         await _validate_bill_id(update_data["bill_id"], account.id, db)
     for field, value in update_data.items():

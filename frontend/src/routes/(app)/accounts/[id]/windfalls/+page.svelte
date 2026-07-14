@@ -3,6 +3,7 @@
 	import { getAccount } from '$lib/api/accounts';
 	import { createWindfall, deleteWindfall, listWindfalls } from '$lib/api/windfalls';
 	import type { BankAccount, Windfall } from '$lib/api/types';
+	import { accountSuffix } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
@@ -89,7 +90,7 @@
 
 <AccountNav {accountId} current="windfalls" />
 <h1 class="mt-2 flex items-center text-2xl font-semibold text-text">
-	Windfalls{#if account} ({account.name}{#if account.institution} - {account.institution}{/if}){/if}
+	Windfalls{accountSuffix(account)}
 	<Tooltip text={windfallTooltip} />
 </h1>
 

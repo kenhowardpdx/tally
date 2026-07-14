@@ -215,6 +215,16 @@
 		});
 	}
 
+	function resetBillAmount(cycle: ForecastCycle, line: ForecastBillLine) {
+		saveOverride({
+			billId: line.bill_id,
+			cycleStartDate: cycle.start_date,
+			completed: line.completed,
+			overrideAmountCents: null,
+			notes: line.notes
+		});
+	}
+
 	function commitBillNotes(cycle: ForecastCycle, line: ForecastBillLine, event: Event) {
 		const raw = (event.target as HTMLInputElement).value.trim();
 		saveOverride({
@@ -244,6 +254,16 @@
 			cycleStartDate: cycle.start_date,
 			completed: line.completed,
 			overrideAmountCents: cents !== null && Number.isNaN(cents) ? null : cents,
+			notes: line.notes
+		});
+	}
+
+	function resetWindfallAmount(cycle: ForecastCycle, line: ForecastWindfallLine) {
+		saveOverride({
+			windfallId: line.windfall_id,
+			cycleStartDate: cycle.start_date,
+			completed: line.completed,
+			overrideAmountCents: null,
 			notes: line.notes
 		});
 	}
@@ -392,8 +412,8 @@
 											<div class="ml-auto flex items-center gap-2">
 												<span class="text-xs text-slate-400">$</span>
 												<input
-													type="number"
-													step="0.01"
+													type="text"
+													inputmode="decimal"
 													placeholder={(bill.forecasted_amount_cents / 100).toString()}
 													value={currentOverrideAmount(bill) !== null
 														? (bill.amount_cents / 100).toString()
@@ -401,6 +421,15 @@
 													onchange={(event) => commitBillAmount(cycle, bill, event)}
 													class="w-20 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
 												/>
+												{#if currentOverrideAmount(bill) !== null}
+													<button
+														type="button"
+														class="text-xs text-slate-400 underline hover:text-primary"
+														onclick={() => resetBillAmount(cycle, bill)}
+													>
+														Reset
+													</button>
+												{/if}
 												<input
 													type="text"
 													placeholder="Note"
@@ -467,8 +496,8 @@
 											<div class="ml-auto flex items-center gap-2">
 												<span class="text-xs text-slate-400">$</span>
 												<input
-													type="number"
-													step="0.01"
+													type="text"
+													inputmode="decimal"
 													placeholder={(windfall.forecasted_amount_cents / 100).toString()}
 													value={currentOverrideAmount(windfall) !== null
 														? (windfall.amount_cents / 100).toString()
@@ -476,6 +505,15 @@
 													onchange={(event) => commitWindfallAmount(cycle, windfall, event)}
 													class="w-20 rounded-card border border-slate-300 px-2 py-1 text-right text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
 												/>
+												{#if currentOverrideAmount(windfall) !== null}
+													<button
+														type="button"
+														class="text-xs text-slate-400 underline hover:text-primary"
+														onclick={() => resetWindfallAmount(cycle, windfall)}
+													>
+														Reset
+													</button>
+												{/if}
 												<input
 													type="text"
 													placeholder="Note"

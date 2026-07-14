@@ -35,6 +35,8 @@ A multi-user bill-tracking and forecasting app, evolved from
 13. Export a forecast in a form suited to pasting into an LLM (e.g. Claude.ai) for
     analysis — Ken's specific case is getting feedback on a student loan payoff
     strategy against the forecasted cash flow
+14. SEO for the public marketing/legal pages — real indexable content instead of a
+    bare JS-shell HTML response, so the site can actually be found and indexed
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -708,6 +710,38 @@ data-availability one.
       (`frontend/src/routes/(app)/accounts/[id]/forecast/+page.svelte`), matching the
       existing bills-export download pattern.
 
+## Phase 9 — SEO
+
+**Status**: not started - deferred, captured per Ken's request.
+
+Vision item 14. Ken fetched the production homepage as a crawler would and got back an
+essentially empty shell: a bare `<title>Tally</title>`, a viewport tag, no visible
+body content - and confirmed via `site:tally.kenhoward.dev` that it isn't indexed by
+Google or Bing at all. Root cause is architectural and deliberate, not a bug: the root
+`+layout.js` sets `export const ssr = false` and `export const prerender = false` for
+the *entire* app ("Fully client-side SPA... Auth0 auth state and all data come from
+client-side fetches, so there's nothing meaningful to prerender or server-render" -
+true for the authenticated `(app)` routes, but not for the public marketing/legal pages
+that sit outside that group).
+
+- [ ] Prerender the actually-public routes - `/` (the marketing/demo page), `/privacy`,
+      `/terms` - via a per-route `export const prerender = true` override, so they ship
+      real static HTML instead of an empty shell. Everything under `(app)/` (including
+      `glossary`, despite sitting next to the public routes today) requires auth and
+      should stay client-only - no server/prerender path can know a visitor's identity
+      or data anyway. `svelte.config.js`'s `adapter-static` + `fallback: 'index.html'`
+      (S3/CloudFront serves the SPA shell for unknown paths, per
+      `infra/modules/frontend_s3/main.tf`) already supports mixing prerendered routes
+      with client-only fallback routes - this is a per-route export change, not an
+      infra or adapter change.
+- [ ] Real per-route `<title>` and meta description (`app.html` only has the static
+      `<title>Tally</title>` today) - at minimum for `/`, `/privacy`, `/terms`.
+- [ ] `sitemap.xml` listing the prerendered public routes. `static/robots.txt` already
+      exists and allows crawling everything (`Disallow:` with no path) - unaffected by
+      this, since it never blocked crawling; there was just nothing worth indexing yet.
+- [ ] Manual, one-time submission of the sitemap/URL via Google Search Console and Bing
+      Webmaster Tools once there's real content to index - not something CI/code can do.
+
 ## Legacy GitHub Project issue crosswalk
 
 Use this when closing the old project-management issues so their intent stays visible here:
@@ -970,3 +1004,17 @@ session (or a fresh Claude Code instance) orient in under a minute.
   decided between plain text/Markdown and CSV). Not started, captured here per Ken's
   request. Next: Phase 5's remaining items, Phase 7/8 whenever it's time, or any
   newly-discovered polish item.
+- 2026-07-13: Fixed a forecast UX bug - the active cycle's amount override input was
+  `type="number"`, so its native spinner arrows started counting from 0 on the empty
+  field (empty is the normal "no override yet" state), silently committing a near-zero
+  override on a single accidental click with no way back short of looking the original
+  amount up on the bills page. Switched to `type="text" inputmode="decimal"` and added
+  an explicit "Reset" link, shown only while an override is active, that clears it back
+  to the forecasted default in place. Verified in-browser via Playwright against the
+  docker-compose stack. Also added Vision item 14 and Phase 9 (SEO - the production
+  homepage is an empty JS-shell response with a bare `<title>Tally</title>` and no
+  meta description, unindexed by Google/Bing; root layout's `ssr = false` /
+  `prerender = false` is deliberate for the authenticated app but was never scoped away
+  from the public `/`, `/privacy`, `/terms` pages, which is the actual fix). Not
+  started, captured per Ken's request. Next: Phase 5's remaining items, Phase 7/8/9
+  whenever it's time, or any newly-discovered polish item.

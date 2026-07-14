@@ -37,6 +37,9 @@ A multi-user bill-tracking and forecasting app, evolved from
     strategy against the forecasted cash flow
 14. SEO for the public marketing/legal pages — real indexable content instead of a
     bare JS-shell HTML response, so the site can actually be found and indexed
+15. A one-click way to roll a forecast forward into the next cycle period, prefilling
+    starting balance from the current cycle's ending balance and carrying forward
+    income per cycle, instead of looking both up manually and retyping them
 
 ## What to reuse from `kenhowardpdx/bank`
 
@@ -742,6 +745,30 @@ that sit outside that group).
 - [ ] Manual, one-time submission of the sitemap/URL via Google Search Console and Bing
       Webmaster Tools once there's real content to index - not something CI/code can do.
 
+## Phase 10 — Roll a forecast into the next cycle
+
+**Status**: not started - deferred, captured per Ken's request.
+
+Vision item 15. The forecast page
+(`frontend/src/routes/(app)/accounts/[id]/forecast/+page.svelte`) takes a starting
+balance, income per cycle, start/end date, and cycle type, and computes a
+`ForecastResponse` of per-cycle `running_balance_cents`. Once the current cycle ends,
+starting the next planning period today means manually reading the current cycle's
+ending balance off the table and retyping it into "Starting balance" - Ken wants a
+one-click action instead: a prompt (values editable, not blindly applied) defaulting
+"Starting balance" to the current cycle's ending balance and "Income per cycle" to
+whatever's already entered.
+
+- [ ] Frontend: a "Start next cycle" action, likely next to the existing "Current
+      cycle" badge (`isActiveCycle`/the cycle-row rendering in `+page.svelte`) or the
+      forecast settings form. On click, prefill a form/modal with
+      `startingBalance` = the active cycle's `running_balance_cents`, `incomePerCycle`
+      unchanged, and a sensible next `startDate`/`endDate` - user confirms (or edits)
+      before it replaces the current forecast settings and recalculates.
+      `account.forecast_*` fields already persist across sessions (set by `/forecast`
+      itself, per Phase 2), so this is a UI convenience over data the account already
+      tracks, not a new persistence concept.
+
 ## Legacy GitHub Project issue crosswalk
 
 Use this when closing the old project-management issues so their intent stays visible here:
@@ -1018,3 +1045,21 @@ session (or a fresh Claude Code instance) orient in under a minute.
   from the public `/`, `/privacy`, `/terms` pages, which is the actual fix). Not
   started, captured per Ken's request. Next: Phase 5's remaining items, Phase 7/8/9
   whenever it's time, or any newly-discovered polish item.
+- 2026-07-13: Shipped two bill-review flags and a shared row-actions menu. Bills whose
+  `start_date == end_date` (single-expense bills ported from the old 'bank' app, e.g.
+  "Averie's Graduation Party") now get a "One-time" badge suggesting a Transaction
+  instead; bills past their `end_date` are auto-disabled the next time they're listed
+  (no cron in this app, by design - see CLAUDE.md) and get an "Ended" badge, with a
+  `disabled` bill_event recorded for the audit trail. Also consolidated Bills'
+  Edit/Move/Delete buttons into a new shared `RowActionsMenu` kebab component, and
+  brought Transactions and Windfalls (previously Delete-only) up to the same
+  Edit/Move/Delete parity through the same menu. Found and fixed a real bug along the
+  way: `Table`'s `overflow-x-auto` wrapper computes `overflow-y: auto` too (per the CSS
+  overflow spec), silently clipping a row-relative dropdown on any row near the bottom
+  of a list - fixed by having the menu portal to `<body>` and position itself via fixed
+  coordinates instead. Backend: 161 tests pass (8 new), ruff clean. Frontend: lint/
+  check/test/build all clean, verified in-browser via Playwright against the
+  docker-compose stack. Added Vision item 15 and Phase 10 (roll a forecast into the
+  next cycle, prefilling starting balance from the current cycle's ending balance) -
+  not started, captured per Ken's request. Next: Phase 5's remaining items, Phase
+  7/8/9/10 whenever it's time, or any newly-discovered polish item.

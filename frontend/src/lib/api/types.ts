@@ -28,6 +28,21 @@ export interface BankAccountInput {
 	institution?: string | null;
 }
 
+// Shared shape across Bills/Transactions/Windfalls CSV import preview -
+// see docs/ROADMAP.md's CSV reconciliation entry for the full design.
+
+export interface ImportRowIssue {
+	row: number;
+	message: string;
+}
+
+export interface ImportAmbiguous {
+	// No row number - describes a match collision found during
+	// reconciliation (a CSV row's key matched more than one existing row),
+	// not a single malformed CSV row.
+	message: string;
+}
+
 export interface Bill {
 	id: number;
 	account_id: number;
@@ -54,6 +69,34 @@ export interface BillInput {
 	notes?: string | null;
 }
 
+export interface BillImportUpdate {
+	id: number;
+	fields: BillInput;
+}
+
+export interface BillImportPreview {
+	new: BillInput[];
+	updated: BillImportUpdate[];
+	unchanged_count: number;
+	ambiguous: ImportAmbiguous[];
+	// Currently-enabled bills that will be disabled (not deleted) if this
+	// preview is committed.
+	omitted: Bill[];
+	errors: ImportRowIssue[];
+}
+
+export interface BillImportCommitRequest {
+	new: BillInput[];
+	updated: BillImportUpdate[];
+	omitted_ids: number[];
+}
+
+export interface BillImportCommitResponse {
+	created: Bill[];
+	updated: Bill[];
+	disabled_count: number;
+}
+
 export interface Transaction {
 	id: number;
 	account_id: number;
@@ -72,6 +115,38 @@ export interface TransactionInput {
 	bill_id?: number | null;
 }
 
+export interface TransactionImportUpdate {
+	id: number;
+	fields: TransactionInput;
+}
+
+export interface TransactionImportPreview {
+	new: TransactionInput[];
+	updated: TransactionImportUpdate[];
+	unchanged_count: number;
+	ambiguous: ImportAmbiguous[];
+	// Existing transactions that will be *permanently deleted* if this
+	// preview is committed - unlike Bills/Windfalls there's no soft-delete
+	// flag for Transaction.
+	omitted: Transaction[];
+	// bill_name didn't resolve to exactly one bill on this account - the row
+	// still imports, just unlinked (bill_id null).
+	warnings: ImportRowIssue[];
+	errors: ImportRowIssue[];
+}
+
+export interface TransactionImportCommitRequest {
+	new: TransactionInput[];
+	updated: TransactionImportUpdate[];
+	omitted_ids: number[];
+}
+
+export interface TransactionImportCommitResponse {
+	created: Transaction[];
+	updated: Transaction[];
+	deleted_count: number;
+}
+
 export interface Windfall {
 	id: number;
 	account_id: number;
@@ -79,6 +154,7 @@ export interface Windfall {
 	// Always positive - a windfall is income by definition.
 	amount_cents: number;
 	expected_date: string;
+	enabled: boolean;
 	created_at: string;
 }
 
@@ -86,6 +162,35 @@ export interface WindfallInput {
 	name: string;
 	amount_cents: number;
 	expected_date: string;
+	enabled?: boolean;
+}
+
+export interface WindfallImportUpdate {
+	id: number;
+	fields: WindfallInput;
+}
+
+export interface WindfallImportPreview {
+	new: WindfallInput[];
+	updated: WindfallImportUpdate[];
+	unchanged_count: number;
+	ambiguous: ImportAmbiguous[];
+	// Currently-enabled windfalls that will be disabled (not deleted) if
+	// this preview is committed.
+	omitted: Windfall[];
+	errors: ImportRowIssue[];
+}
+
+export interface WindfallImportCommitRequest {
+	new: WindfallInput[];
+	updated: WindfallImportUpdate[];
+	omitted_ids: number[];
+}
+
+export interface WindfallImportCommitResponse {
+	created: Windfall[];
+	updated: Windfall[];
+	disabled_count: number;
 }
 
 export interface ForecastRequest {

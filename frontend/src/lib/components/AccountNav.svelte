@@ -4,14 +4,15 @@
 		current
 	}: {
 		accountId: number;
-		current: 'bills' | 'transactions' | 'windfalls' | 'forecast';
+		current: 'bills' | 'transactions' | 'windfalls' | 'forecast' | 'settings';
 	} = $props();
 
 	const links = $derived<{ key: typeof current; label: string; href: string }[]>([
 		{ key: 'bills', label: 'Bills', href: `/accounts/${accountId}` },
 		{ key: 'transactions', label: 'Transactions', href: `/accounts/${accountId}/transactions` },
 		{ key: 'windfalls', label: 'Windfalls', href: `/accounts/${accountId}/windfalls` },
-		{ key: 'forecast', label: 'Forecast', href: `/accounts/${accountId}/forecast` }
+		{ key: 'forecast', label: 'Forecast', href: `/accounts/${accountId}/forecast` },
+		{ key: 'settings', label: 'Settings', href: `/accounts/${accountId}/settings` }
 	]);
 </script>
 

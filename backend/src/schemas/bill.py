@@ -47,3 +47,45 @@ class BillRead(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class BillImportRowIssue(BaseModel):
+    row: int
+    message: str
+
+
+class BillImportAmbiguous(BaseModel):
+    # No row number - this describes a match collision found during
+    # reconciliation (a CSV row's key matched more than one existing bill),
+    # not a single malformed CSV row.
+    message: str
+
+
+class BillImportUpdate(BaseModel):
+    id: int
+    fields: BillCreate
+
+
+class BillImportPreview(BaseModel):
+    new: list[BillCreate]
+    updated: list[BillImportUpdate]
+    unchanged_count: int
+    ambiguous: list[BillImportAmbiguous]
+    # Currently-enabled bills that will be disabled (not deleted - see
+    # bill_events/bill_history) if this preview is committed.
+    omitted: list[BillRead]
+    errors: list[BillImportRowIssue]
+
+
+class BillImportCommitRequest(BaseModel):
+    # Echoes the shape BillImportPreview returned - the client sends back
+    # exactly what it wants applied, not the original CSV file.
+    new: list[BillCreate]
+    updated: list[BillImportUpdate]
+    omitted_ids: list[int]
+
+
+class BillImportCommitResponse(BaseModel):
+    created: list[BillRead]
+    updated: list[BillRead]
+    disabled_count: int

@@ -270,14 +270,18 @@ per-PR preview branch) make manual Neon console clicks a recurring chore.
       (previously always omitted). Also rebuilt `Select.svelte` as a custom Tailwind
       popover listbox (mirroring `DatePicker.svelte`'s pattern) instead of a native
       `<select>`, since this item needed more per-type fields on top of it.
-- [x] 1.8 Bills CSV import/export per bank account. Backend: `GET/POST
-      .../bills/{export,import}` (`backend/src/bills_csv.py`, `backend/src/api/bills.py`) -
+- [x] 1.8 CSV import/export for Bills, Transactions, and Windfalls, with reconciliation on
+      reimport instead of insert-only duplication - see the 2026-07-15 changelog entry
+      below for the full design (fuzzy field-match, preview-then-confirm, and per-type
+      omitted-row semantics that avoid cascading away `bill_events`/`cycle_overrides`
+      history). Backend: `GET .../{bills,transactions,windfalls}/export`,
+      `POST .../import/{preview,commit}` (`backend/src/{bills,transactions,windfalls}_csv.py`,
+      `backend/src/csv_match.py`, `backend/src/api/{bills,transactions,windfalls}.py`) -
       dollars not cents, `semimonthly_days`/`custom_interval_days` as their own columns
-      instead of raw JSON, all-or-nothing import validation (a 422 with a per-row error
-      list if any row fails, nothing inserted). Frontend: Import/Export buttons on the
-      bills page (`frontend/src/lib/api/bills.ts`'s `exportBillsCsv`/`importBillsCsv`, via
-      `apiFetch` directly rather than `apiJson` since a CSV blob/multipart upload isn't
-      JSON).
+      instead of raw JSON. Frontend: a new per-account Settings page
+      (`frontend/src/routes/(app)/accounts/[id]/settings/+page.svelte`, linked from
+      `AccountNav`) is now the one place for all three types' Import/Export, replacing the
+      original Bills-page-only buttons.
 - [x] 1.9 Bill notes support. `Bill.notes` (nullable, migration `12aa348bb14f`), threaded
       through `BillCreate`/`Update`/`Read` and the create form + edit modal (no dedicated
       bills-table column, to avoid clutter - the edit modal is the "detail affordance").
@@ -1063,3 +1067,61 @@ session (or a fresh Claude Code instance) orient in under a minute.
   next cycle, prefilling starting balance from the current cycle's ending balance) -
   not started, captured per Ken's request. Next: Phase 5's remaining items, Phase
   7/8/9/10 whenever it's time, or any newly-discovered polish item.
+- 2026-07-15: Expanded 1.8 from Bills-only CSV import/export into all three types
+  (Bills/Transactions/Windfalls), with reconciliation on reimport per Ken's request -
+  re-importing shouldn't duplicate rows that are already there, and (the harder
+  constraint) reconciliation must never destroy history: `bill_events` and
+  `cycle_overrides`/`bill_history` hang off a bill's or windfall's `id` via
+  `ondelete="CASCADE"`, so a naive delete-and-reinsert on every import would silently
+  wipe them even for a row that's logically unchanged. Design, in order of what it took
+  to get right:
+  - **Matching**: fuzzy field-match per type (no id column round-tripped through the
+    CSV, so it works for hand-edited CSVs and re-exports alike) - Bills key on
+    `(name, amount_cents, recurrence_type, start_date)`, Transactions on
+    `(date, amount_cents, description)`, Windfalls on `(name, amount_cents,
+    expected_date)`. New shared `backend/src/csv_match.py` (generic `reconcile()`,
+    PEP 695 type params) buckets every parsed row into new/updated/unchanged/ambiguous
+    (2+ existing rows share a key - excluded from commit, reported for manual
+    resolution) plus omitted (an existing row's key never appeared in the file).
+  - **On match**: update the existing row's other fields in place - for Bills this
+    reuses `update_events` (the same before/after diff helper `PATCH /bills/{id}`
+    already uses), so a CSV-driven edit produces the identical `bill_events.UPDATED`
+    entry a UI edit would.
+  - **Sync/omitted semantics, chosen per-type specifically to avoid the cascade-delete
+    problem**: Bills and Windfalls omitted from a reimport are soft-deleted
+    (`enabled = False`, reusing the same mechanism `_auto_disable_expired` already used
+    for expired bills - a new `disabled_event()` helper in `bill_events.py` covers both
+    call sites) rather than hard-deleted, so their history survives and they can
+    reappear in a later import. This required adding `Windfall.enabled` (migration
+    `b88c09336fb3`), which didn't exist before - threaded through
+    `WindfallCreate`/`Update`/`Read`, the windfalls list page (new enabled/disabled
+    `Badge` + toggle, mirroring Bills), and excluded from `/forecast` and `/dashboard`'s
+    windfall queries the same way `Bill.enabled` already was. Transactions, by contrast,
+    have no downstream table referencing `transactions.id` and no soft-delete flag, so
+    an omitted transaction is hard-deleted - reconciling against a full transaction
+    export can genuinely prune stale rows, at the cost of that being irreversible (the
+    Settings page requires an explicit "I understand this cannot be undone" acknowledgement
+    before a commit with any omitted transactions is allowed through).
+  - **Preview before commit, not apply-immediately**: `POST .../import/preview` parses
+    and matches without writing anything, returning the five buckets; the frontend
+    shows counts and confirms before `POST .../import/commit` - which receives back
+    the *same* new/updated/omitted-ids shape the preview returned (not the original
+    file), keeping the Lambda side fully stateless (no server-held preview session).
+  - **Transaction↔Bill link**: represented in the CSV by the linked bill's *name*, not
+    id (`backend/src/transactions_csv.py`) - 0 or 2+ bills matching that name import
+    the transaction unlinked with a per-row warning rather than failing the row.
+  Frontend: new account-level Settings page
+  (`frontend/src/routes/(app)/accounts/[id]/settings/+page.svelte`, new `AccountNav` tab)
+  is the one place for all three types' Import/Export, replacing the original
+  Bills-page-only buttons; new shared `ImportPreviewModal.svelte` (presentational only -
+  each page formats its own new/updated/omitted rows into plain-string summaries before
+  passing them in) renders the preview and gates the Transactions delete-acknowledgement
+  checkbox. Also fixed an unrelated reported bug found along the way: the Bills page's
+  Amount input was missing `step="0.01"` (present on Transactions'/Windfalls' equivalents),
+  so browsers rounded to whole dollars - couldn't enter e.g. 79.99. Backend: 192 tests pass
+  (44 new), ruff clean. Frontend: lint/`svelte-check`/tests all clean (Node 24 required -
+  the sandbox's default Node 20.9 predates `node:util`'s `styleText` export that
+  `@sveltejs/vite-plugin-svelte` now needs; `nvm use v24.11.0` first). Not yet verified
+  in-browser via Playwright - next session should do that pass before considering this
+  fully done. Next: Phase 5's remaining items, Phase 7/8/9/10 whenever it's time, or any
+  newly-discovered polish item.

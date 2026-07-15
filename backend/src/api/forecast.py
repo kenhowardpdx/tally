@@ -77,6 +77,7 @@ async def compute_forecast(
     windfalls_result = await db.execute(
         select(Windfall).where(
             Windfall.account_id == account.id,
+            Windfall.enabled.is_(True),
             Windfall.expected_date >= payload.start_date,
             Windfall.expected_date <= query_end_date,
         )

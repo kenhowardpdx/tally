@@ -4,6 +4,9 @@ import type {
 	BillEventCycleCountsResponse,
 	BillEventListResponse,
 	BillHistoryResponse,
+	BillImportCommitRequest,
+	BillImportCommitResponse,
+	BillImportPreview,
 	BillInput
 } from '$lib/api/types';
 
@@ -71,18 +74,18 @@ export async function exportBillsCsv(accountId: number): Promise<Blob> {
 	return res.blob();
 }
 
-export interface BillImportRowError {
+export interface ImportRowError {
 	row: number;
 	message: string;
 }
 
-export async function importBillsCsv(accountId: number, file: File): Promise<Bill[]> {
+export async function previewBillImportCsv(accountId: number, file: File): Promise<BillImportPreview> {
 	const formData = new FormData();
 	formData.append('file', file);
 	// apiFetch, not apiJson - a FormData body must NOT have a Content-Type set
 	// manually (the browser generates the multipart boundary itself); apiJson
 	// would force Content-Type: application/json since none is passed here.
-	const res = await apiFetch(`/api/v1/accounts/${accountId}/bills/import`, {
+	const res = await apiFetch(`/api/v1/accounts/${accountId}/bills/import/preview`, {
 		method: 'POST',
 		body: formData
 	});
@@ -95,4 +98,14 @@ export async function importBillsCsv(accountId: number, file: File): Promise<Bil
 		throw new ApiError(res.status, body);
 	}
 	return res.json();
+}
+
+export function commitBillImportCsv(
+	accountId: number,
+	payload: BillImportCommitRequest
+): Promise<BillImportCommitResponse> {
+	return apiJson(`/api/v1/accounts/${accountId}/bills/import/commit`, {
+		method: 'POST',
+		body: JSON.stringify(payload)
+	});
 }

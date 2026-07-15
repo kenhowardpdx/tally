@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -21,6 +21,10 @@ class Windfall(Base):
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     expected_date: Mapped[date] = mapped_column(Date)
     name: Mapped[str] = mapped_column(String(255))
+    # Soft-delete flag, same purpose as Bill.enabled - lets CSV import "omit
+    # this row" mean disable (cycle_overrides survive) rather than a hard
+    # delete that would cascade them away.
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -219,3 +219,155 @@ async def test_transactions_scoped_to_account_owner(client: AsyncClient):
         f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload()
     )
     assert res.status_code == 404
+
+
+async def _create_bill(client: AsyncClient, account_id: int, **overrides) -> dict:
+    payload = {
+        "name": "Rent",
+        "amount_cents": 150000,
+        "recurrence_type": "monthly",
+        "start_date": "2024-01-01",
+    }
+    payload.update(overrides)
+    res = await client.post(f"/api/v1/accounts/{account_id}/bills", json=payload)
+    return res.json()
+
+
+async def _preview(client: AsyncClient, account_id: int, csv_text: str):
+    return await client.post(
+        f"/api/v1/accounts/{account_id}/transactions/import/preview",
+        files={"file": ("transactions.csv", csv_text, "text/csv")},
+    )
+
+
+async def test_export_transactions_includes_linked_bill_name(client: AsyncClient):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions",
+        json=_transaction_payload(bill_id=bill["id"]),
+    )
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/transactions/export")
+    assert res.status_code == 200
+    assert "bill_name" in res.text
+    assert "Rent" in res.text
+
+
+async def test_preview_transaction_import_resolves_bill_name_to_bill_id(client: AsyncClient):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    csv_text = "date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,Rent\n"
+
+    res = await _preview(client, account["id"], csv_text)
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["new"]) == 1
+    assert body["new"][0]["bill_id"] == bill["id"]
+    assert body["warnings"] == []
+
+
+async def test_preview_transaction_import_warns_on_unresolved_bill_name(client: AsyncClient):
+    account = await _create_account(client)
+    csv_text = "date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,Nonexistent\n"
+
+    res = await _preview(client, account["id"], csv_text)
+    body = res.json()
+    assert body["new"][0]["bill_id"] is None
+    assert len(body["warnings"]) == 1
+    assert "Nonexistent" in body["warnings"][0]["message"]
+
+
+async def test_preview_transaction_import_warns_on_ambiguous_bill_name(client: AsyncClient):
+    account = await _create_account(client)
+    await _create_bill(client, account["id"])
+    await _create_bill(client, account["id"])
+    csv_text = "date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,Rent\n"
+
+    res = await _preview(client, account["id"], csv_text)
+    body = res.json()
+    assert body["new"][0]["bill_id"] is None
+    assert len(body["warnings"]) == 1
+    assert "Rent" in body["warnings"][0]["message"]
+
+
+async def test_commit_transaction_import_creates_new_rows(client: AsyncClient):
+    account = await _create_account(client)
+    payload = {
+        "new": [{"amount_cents": -2500, "date": "2024-01-15", "description": "Coffee", "bill_id": None}],
+        "updated": [],
+        "omitted_ids": [],
+    }
+    res = await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions/import/commit", json=payload
+    )
+    assert res.status_code == 200
+    assert len(res.json()["created"]) == 1
+
+    res = await client.get(f"/api/v1/accounts/{account['id']}/transactions")
+    assert len(res.json()) == 1
+
+
+async def test_reimporting_unmodified_export_is_all_unchanged(client: AsyncClient):
+    account = await _create_account(client)
+    await client.post(f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload())
+
+    export_res = await client.get(f"/api/v1/accounts/{account['id']}/transactions/export")
+    res = await _preview(client, account["id"], export_res.text)
+    body = res.json()
+    assert body["new"] == []
+    assert body["updated"] == []
+    assert body["unchanged_count"] == 1
+    assert body["omitted"] == []
+
+
+async def test_reimporting_with_new_bill_link_shows_as_updated(client: AsyncClient):
+    account = await _create_account(client)
+    bill = await _create_bill(client, account["id"])
+    await client.post(f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload())
+
+    csv_text = f"date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,{bill['name']}\n"
+    res = await _preview(client, account["id"], csv_text)
+    body = res.json()
+    assert body["new"] == []
+    assert len(body["updated"]) == 1
+    assert body["updated"][0]["fields"]["bill_id"] == bill["id"]
+
+
+async def test_transaction_omitted_from_csv_is_hard_deleted(client: AsyncClient):
+    account = await _create_account(client)
+    kept = await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions", json=_transaction_payload()
+    )
+    dropped = await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions",
+        json=_transaction_payload(description="Groceries", amount_cents=-5000),
+    )
+    dropped_id = dropped.json()["id"]
+
+    csv_text = "date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,\n"
+    preview = (await _preview(client, account["id"], csv_text)).json()
+    assert len(preview["omitted"]) == 1
+    assert preview["omitted"][0]["id"] == dropped_id
+
+    commit_res = await client.post(
+        f"/api/v1/accounts/{account['id']}/transactions/import/commit",
+        json={"new": [], "updated": [], "omitted_ids": [row["id"] for row in preview["omitted"]]},
+    )
+    assert commit_res.status_code == 200
+    assert commit_res.json()["deleted_count"] == 1
+
+    list_res = await client.get(f"/api/v1/accounts/{account['id']}/transactions")
+    descriptions = {t["description"] for t in list_res.json()}
+    assert descriptions == {"Coffee"}
+
+    assert kept.status_code == 201  # sanity: the "kept" transaction was actually created
+
+
+async def test_preview_transaction_import_scoped_to_account_owner(client: AsyncClient):
+    account = await _create_account(client)
+    csv_text = "date,amount,description,bill_name\n2024-01-15,-25.00,Coffee,\n"
+
+    _login_as("auth0|someone-else")
+    res = await _preview(client, account["id"], csv_text)
+    assert res.status_code == 404

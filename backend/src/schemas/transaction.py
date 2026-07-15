@@ -39,3 +39,47 @@ class TransactionRead(BaseModel):
     date: date_
     description: str | None
     created_at: datetime
+
+
+class TransactionImportRowIssue(BaseModel):
+    row: int
+    message: str
+
+
+class TransactionImportAmbiguous(BaseModel):
+    # No row number - describes a match collision found during
+    # reconciliation, not a single malformed CSV row.
+    message: str
+
+
+class TransactionImportUpdate(BaseModel):
+    id: int
+    fields: TransactionCreate
+
+
+class TransactionImportPreview(BaseModel):
+    new: list[TransactionCreate]
+    updated: list[TransactionImportUpdate]
+    unchanged_count: int
+    ambiguous: list[TransactionImportAmbiguous]
+    # Existing transactions that will be *permanently deleted* if this
+    # preview is committed - unlike Bills/Windfalls, Transaction has no
+    # soft-delete flag and nothing references transactions.id, so omission
+    # here means a real, irreversible DELETE.
+    omitted: list[TransactionRead]
+    # bill_name didn't resolve to exactly one bill on this account - the row
+    # still imports, just unlinked (bill_id null).
+    warnings: list[TransactionImportRowIssue]
+    errors: list[TransactionImportRowIssue]
+
+
+class TransactionImportCommitRequest(BaseModel):
+    new: list[TransactionCreate]
+    updated: list[TransactionImportUpdate]
+    omitted_ids: list[int]
+
+
+class TransactionImportCommitResponse(BaseModel):
+    created: list[TransactionRead]
+    updated: list[TransactionRead]
+    deleted_count: int

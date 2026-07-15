@@ -1,5 +1,11 @@
-import { apiJson } from '$lib/api';
-import type { Transaction, TransactionInput } from '$lib/api/types';
+import { apiFetch, apiJson, ApiError } from '$lib/api';
+import type {
+	Transaction,
+	TransactionImportCommitRequest,
+	TransactionImportCommitResponse,
+	TransactionImportPreview,
+	TransactionInput
+} from '$lib/api/types';
 
 export function listTransactions(accountId: number): Promise<Transaction[]> {
 	return apiJson(`/api/v1/accounts/${accountId}/transactions`);
@@ -29,5 +35,45 @@ export function updateTransaction(
 export function deleteTransaction(accountId: number, transactionId: number): Promise<void> {
 	return apiJson(`/api/v1/accounts/${accountId}/transactions/${transactionId}`, {
 		method: 'DELETE'
+	});
+}
+
+export async function exportTransactionsCsv(accountId: number): Promise<Blob> {
+	const res = await apiFetch(`/api/v1/accounts/${accountId}/transactions/export`);
+	if (!res.ok) throw new ApiError(res.status, await res.text());
+	return res.blob();
+}
+
+export async function previewTransactionImportCsv(
+	accountId: number,
+	file: File
+): Promise<TransactionImportPreview> {
+	const formData = new FormData();
+	formData.append('file', file);
+	// apiFetch, not apiJson - a FormData body must NOT have a Content-Type set
+	// manually (the browser generates the multipart boundary itself); apiJson
+	// would force Content-Type: application/json since none is passed here.
+	const res = await apiFetch(`/api/v1/accounts/${accountId}/transactions/import/preview`, {
+		method: 'POST',
+		body: formData
+	});
+	if (!res.ok) {
+		// Mirrors apiJson's error-body handling: an error response isn't
+		// guaranteed to be JSON (e.g. a proxy's 502/504 page), so a raw
+		// res.json() here could throw a parse error instead of a clean
+		// ApiError.
+		const body = await res.json().catch(() => null);
+		throw new ApiError(res.status, body);
+	}
+	return res.json();
+}
+
+export function commitTransactionImportCsv(
+	accountId: number,
+	payload: TransactionImportCommitRequest
+): Promise<TransactionImportCommitResponse> {
+	return apiJson(`/api/v1/accounts/${accountId}/transactions/import/commit`, {
+		method: 'POST',
+		body: JSON.stringify(payload)
 	});
 }

@@ -1,11 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
 from src.core.database import get_db
 from src.models import BankAccount, Bill, Transaction, User
-from src.schemas.transaction import TransactionCreate, TransactionRead, TransactionUpdate
+from src.schemas.transaction import (
+    TransactionCreate,
+    TransactionImportAmbiguous,
+    TransactionImportCommitRequest,
+    TransactionImportCommitResponse,
+    TransactionImportPreview,
+    TransactionImportRowIssue,
+    TransactionImportUpdate,
+    TransactionRead,
+    TransactionUpdate,
+)
+from src.transactions_csv import parse_csv_rows, reconcile_transactions, transactions_to_csv
 
 router = APIRouter(prefix="/api/v1/accounts/{account_id}/transactions", tags=["transactions"])
 
@@ -75,6 +87,122 @@ async def create_transaction(
     await db.commit()
     await db.refresh(transaction)
     return transaction
+
+
+@router.get("/export")
+async def export_transactions(
+    db: AsyncSession = Depends(get_db),
+    account: BankAccount = Depends(get_owned_bank_account),
+) -> Response:
+    transactions_result = await db.execute(
+        select(Transaction).where(Transaction.account_id == account.id)
+    )
+    bills_result = await db.execute(select(Bill).where(Bill.account_id == account.id))
+    csv_text = transactions_to_csv(
+        list(transactions_result.scalars().all()), list(bills_result.scalars().all())
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="transactions-{account.id}.csv"'},
+    )
+
+
+def _describe_ambiguous_transaction(parsed: TransactionCreate) -> str:
+    return (
+        f"${parsed.amount_cents / 100:.2f} on {parsed.date}"
+        f'{f" ({parsed.description})" if parsed.description else ""} matches more than one '
+        "existing transaction - resolve manually before reimporting."
+    )
+
+
+@router.post("/import/preview", response_model=TransactionImportPreview)
+async def preview_transaction_import(
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db),
+    account: BankAccount = Depends(get_owned_bank_account),
+) -> TransactionImportPreview:
+    csv_text = (await file.read()).decode("utf-8-sig")  # -sig strips an Excel-added BOM
+    bills_result = await db.execute(select(Bill).where(Bill.account_id == account.id))
+    bills = list(bills_result.scalars().all())
+    parsed_transactions, errors, warnings = parse_csv_rows(csv_text, bills)
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"errors": [{"row": e.row, "message": e.message} for e in errors]},
+        )
+
+    transactions_result = await db.execute(
+        select(Transaction).where(Transaction.account_id == account.id)
+    )
+    existing_transactions = list(transactions_result.scalars().all())
+    reconciled = reconcile_transactions(existing_transactions, parsed_transactions)
+
+    return TransactionImportPreview(
+        new=reconciled.new,
+        updated=[
+            TransactionImportUpdate(id=match.existing.id, fields=match.parsed)
+            for match in reconciled.updated
+        ],
+        unchanged_count=len(reconciled.unchanged),
+        ambiguous=[
+            TransactionImportAmbiguous(message=_describe_ambiguous_transaction(a.parsed))
+            for a in reconciled.ambiguous
+        ],
+        omitted=reconciled.omitted,
+        warnings=[TransactionImportRowIssue(row=w.row, message=w.message) for w in warnings],
+        errors=[],
+    )
+
+
+@router.post("/import/commit", response_model=TransactionImportCommitResponse)
+async def commit_transaction_import(
+    payload: TransactionImportCommitRequest,
+    db: AsyncSession = Depends(get_db),
+    account: BankAccount = Depends(get_owned_bank_account),
+) -> TransactionImportCommitResponse:
+    for item in payload.new:
+        await _validate_bill_id(item.bill_id, account.id, db)
+    for item in payload.updated:
+        await _validate_bill_id(item.fields.bill_id, account.id, db)
+
+    created = [Transaction(account_id=account.id, **item.model_dump()) for item in payload.new]
+    db.add_all(created)
+
+    updated: list[Transaction] = []
+    if payload.updated:
+        ids = [item.id for item in payload.updated]
+        result = await db.execute(
+            select(Transaction).where(Transaction.id.in_(ids), Transaction.account_id == account.id)
+        )
+        transactions_by_id = {transaction.id: transaction for transaction in result.scalars().all()}
+        for item in payload.updated:
+            transaction = transactions_by_id.get(item.id)
+            if transaction is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {item.id} not found"
+                )
+            for field, value in item.fields.model_dump().items():
+                setattr(transaction, field, value)
+            updated.append(transaction)
+
+    deleted_count = 0
+    if payload.omitted_ids:
+        result = await db.execute(
+            select(Transaction).where(
+                Transaction.id.in_(payload.omitted_ids), Transaction.account_id == account.id
+            )
+        )
+        to_delete = list(result.scalars().all())
+        for transaction in to_delete:
+            await db.delete(transaction)
+        deleted_count = len(to_delete)
+
+    await db.commit()
+    for transaction in [*created, *updated]:
+        await db.refresh(transaction)
+
+    return TransactionImportCommitResponse(created=created, updated=updated, deleted_count=deleted_count)
 
 
 @router.patch("/{transaction_id}", response_model=TransactionRead)

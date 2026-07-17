@@ -21,6 +21,7 @@
 		"@tailwindcss/vite": "^4.3.2",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.4.2",
+		"@types/d3-shape": "^3.1.8",
 		"@vitest/ui": "^4.1.10",
 		"eslint": "^10.7.0",
 		"eslint-plugin-svelte": "^3.20.0",
@@ -36,6 +37,7 @@
 	},
 	"dependencies": {
 		"@auth0/auth0-spa-js": "^2.23.0",
+		"d3-shape": "^3.2.0",
 		"layerchart": "^2.0.1"
 	}
 }

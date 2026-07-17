@@ -47,7 +47,9 @@
 			{:else if $isAuthenticated}
 				<div class="flex items-center gap-2 sm:gap-3">
 					<span class="hidden text-sm text-slate-600 sm:inline">{$user?.email}</span>
-					<Button variant="secondary" onclick={() => logout()}>Log out</Button>
+					<span class="hidden sm:inline-flex">
+						<Button variant="secondary" onclick={() => logout()}>Log out</Button>
+					</span>
 					<button
 						type="button"
 						class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-primary sm:hidden"
@@ -115,9 +117,18 @@
 				>
 					Glossary
 				</a>
-				<span class="mt-1 border-t border-slate-100 px-2 pt-2 text-xs text-slate-500">
-					{$user?.email}
-				</span>
+				<div class="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 px-2 pt-2">
+					<span class="min-w-0 truncate text-xs text-slate-500">{$user?.email}</span>
+					<Button
+						variant="secondary"
+						onclick={() => {
+							closeMobileMenu();
+							logout();
+						}}
+					>
+						Log out
+					</Button>
+				</div>
 			</nav>
 		{/if}
 	</header>

@@ -14,25 +14,16 @@ function parseLocalDate(iso: string): Date {
 	return new Date(year, month - 1, day);
 }
 
-// Turns the cycle-based forecast response into a point-per-event balance
-// series, instead of one point per cycle boundary - walks every bill/
-// windfall/transaction date within each cycle so the chart's line moves on
-// the date something actually happens, not just at cycle edges.
-//
-// Uses each line's `amount_cents` (override-applied actual), matching what
-// the backend's own net_cents/running_balance_cents are computed from (see
-// build_cycle in backend/src/forecast/cycle.py) - forecasted_amount_cents
-// would silently diverge from the balances shown in the cycle table
-// whenever an override is set.
-//
-// income_per_cycle_cents isn't tied to a specific date in the response (it's
-// a flat per-cycle assumption, not a scheduled line item), so it's anchored
-// at each cycle's start_date - a paycheck-at-the-start-of-the-pay-period is
-// the most natural reading of what "income per cycle" represents.
-export function buildBalanceSeries(
-	forecast: ForecastResponse,
-	incomePerCycleCents: number
-): BalancePoint[] {
+// Turns the cycle-based forecast response into one balance point per cycle
+// boundary (the starting anchor, then each cycle's end at its
+// running_balance_cents). An earlier version plotted a point per bill/
+// windfall/transaction event instead for more intra-cycle detail, but for
+// short (weekly/biweekly) cycles over a long date range that produces a
+// dense repeating sawtooth that reads as noise rather than a trend. Per-
+// cycle points also use the backend's own running_balance_cents directly
+// instead of re-deriving it client-side, so this can never drift from the
+// cycle table above it.
+export function buildBalanceSeries(forecast: ForecastResponse): BalancePoint[] {
 	if (forecast.cycles.length === 0) return [];
 
 	const points: BalancePoint[] = [
@@ -42,27 +33,11 @@ export function buildBalanceSeries(
 		}
 	];
 
-	let running = forecast.starting_balance_cents;
 	for (const cycle of forecast.cycles) {
-		const events = [
-			...cycle.bills.map((line) => ({ date: line.due_date, amountCents: -line.amount_cents })),
-			...cycle.windfalls.map((line) => ({
-				date: line.expected_date,
-				amountCents: line.amount_cents
-			})),
-			...cycle.transactions.map((line) => ({ date: line.date, amountCents: line.amount_cents })),
-			{ date: cycle.start_date, amountCents: incomePerCycleCents }
-		].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
-		for (const event of events) {
-			running += event.amountCents;
-			points.push({ date: parseLocalDate(event.date), balanceCents: running });
-		}
-
-		// Anchors the cycle's end even when nothing happened on that exact
-		// date, so a quiet cycle still reads as a flat segment rather than a
-		// gap in the line.
-		points.push({ date: parseLocalDate(cycle.end_date), balanceCents: running });
+		points.push({
+			date: parseLocalDate(cycle.end_date),
+			balanceCents: cycle.running_balance_cents
+		});
 	}
 
 	return points;

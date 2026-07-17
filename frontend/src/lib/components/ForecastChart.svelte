@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Area, AreaChart, Circle, LinearGradient } from 'layerchart';
+	import { curveMonotoneX } from 'd3-shape';
 	import type { BalancePoint } from '$lib/forecast-chart';
 
 	let { series }: { series: BalancePoint[] } = $props();
@@ -66,7 +67,11 @@
 				{#snippet marks({ context })}
 					<LinearGradient class="from-primary/15 to-primary/0" vertical>
 						{#snippet children({ gradient })}
-							<Area line={{ class: 'stroke-primary stroke-2' }} fill={gradient} />
+							<Area
+								curve={curveMonotoneX}
+								line={{ class: 'stroke-primary stroke-2' }}
+								fill={gradient}
+							/>
 						{/snippet}
 					</LinearGradient>
 					{#if lastPoint}

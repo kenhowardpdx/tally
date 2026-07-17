@@ -47,9 +47,7 @@
 	// Built from `forecast` rather than `lastForecastRequest` so it stays in
 	// sync with cycle_overrides too - refreshForecast() replaces `forecast`
 	// wholesale after an override, which is what this depends on.
-	const balanceSeries = $derived(
-		forecast ? buildBalanceSeries(forecast, Math.round(Number(incomePerCycle) * 100) || 0) : []
-	);
+	const balanceSeries = $derived(forecast ? buildBalanceSeries(forecast) : []);
 	let startDate = $state('');
 	let endDate = $state('');
 	let cycleType = $state<CycleType>('biweekly');

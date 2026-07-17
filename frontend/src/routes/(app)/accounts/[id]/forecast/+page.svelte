@@ -17,10 +17,12 @@
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import DatePicker from '$lib/components/DatePicker.svelte';
+	import ForecastChart from '$lib/components/ForecastChart.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import Table from '$lib/components/Table.svelte';
 	import { cycleTypeLabels } from '$lib/cycle';
+	import { buildBalanceSeries } from '$lib/forecast-chart';
 	import { glossaryTerms } from '$lib/glossary';
 	import { onMount } from 'svelte';
 
@@ -41,6 +43,13 @@
 
 	let startingBalance = $state('0');
 	let incomePerCycle = $state('0');
+
+	// Built from `forecast` rather than `lastForecastRequest` so it stays in
+	// sync with cycle_overrides too - refreshForecast() replaces `forecast`
+	// wholesale after an override, which is what this depends on.
+	const balanceSeries = $derived(
+		forecast ? buildBalanceSeries(forecast, Math.round(Number(incomePerCycle) * 100) || 0) : []
+	);
 	let startDate = $state('');
 	let endDate = $state('');
 	let cycleType = $state<CycleType>('biweekly');
@@ -350,6 +359,10 @@
 			{forecast.unscheduled_bills.map((bill) => bill.name).join(', ')}
 		</p>
 	{/if}
+
+	<div class="mt-6">
+		<ForecastChart series={balanceSeries} />
+	</div>
 
 	<div class="mt-6">
 		<Table>

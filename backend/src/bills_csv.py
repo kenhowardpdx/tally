@@ -2,14 +2,24 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
 from pydantic import ValidationError
 
+from src.csv_match import ReconcileResult, reconcile
 from src.forecast.bill import validate_recurrence_config
 from src.models.bill import Bill, RecurrenceType
 from src.schemas.bill import BillCreate
+
+# Fields compared (via getattr, so must exist under these names on both Bill
+# and BillCreate) once a row's match key resolves to exactly one existing
+# bill, to decide "updated" vs "unchanged". name/amount_cents/
+# recurrence_type/start_date are the match key itself (see _bill_key) so are
+# excluded here - see the "known limitation" this implies in the roadmap:
+# changing a key field looks like a new bill, not an edit of the old one.
+BILL_DIFF_FIELDS = ["recurrence_config", "end_date", "enabled", "notes"]
 
 CSV_COLUMNS = [
     "name",
@@ -161,3 +171,17 @@ def parse_csv_rows(csv_text: str) -> tuple[list[BillCreate], list[RowError]]:
             errors.append(RowError(row=row_number, message=str(exc)))
 
     return bills, errors
+
+
+def _bill_key(row: Bill | BillCreate) -> tuple:
+    return (row.name.strip().lower(), row.amount_cents, row.recurrence_type, row.start_date)
+
+
+def reconcile_bills(
+    existing: Sequence[Bill], parsed: Sequence[BillCreate]
+) -> ReconcileResult[Bill, BillCreate]:
+    """Matches parsed CSV rows against an account's current bills (both
+    enabled and disabled - a CSV row matching a disabled bill with
+    enabled=true in BILL_DIFF_FIELDS re-enables it via the normal "updated"
+    path, rather than needing special-casing here)."""
+    return reconcile(existing, parsed, key_fn=_bill_key, diff_fields=BILL_DIFF_FIELDS)

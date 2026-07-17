@@ -6,13 +6,22 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_bank_account_or_404, get_current_db_user, get_owned_bank_account
-from src.bill_events import TRACKED_BILL_FIELDS, created_event, expired_event, update_events
-from src.bills_csv import bills_to_csv, parse_csv_rows
+from src.bill_events import TRACKED_BILL_FIELDS, created_event, disabled_event, update_events
+from src.bills_csv import bills_to_csv, parse_csv_rows, reconcile_bills
 from src.core.database import get_db
 from src.forecast import ForecastBill, ForecastCycleOverride, build_bill_history, last_cycle_end
 from src.forecast.bill import validate_recurrence_config
 from src.models import BankAccount, Bill, BillEvent, CycleOverride, CycleType, RecurrenceType, User
-from src.schemas.bill import BillCreate, BillRead, BillUpdate
+from src.schemas.bill import (
+    BillCreate,
+    BillImportAmbiguous,
+    BillImportCommitRequest,
+    BillImportCommitResponse,
+    BillImportPreview,
+    BillImportUpdate,
+    BillRead,
+    BillUpdate,
+)
 from src.schemas.bill_event import BillEventCycleCount, BillEventCycleCountsResponse, BillEventListResponse
 from src.schemas.bill_history import BillHistoryEntry, BillHistoryResponse
 
@@ -55,7 +64,7 @@ async def _auto_disable_expired(db: AsyncSession, bills: list[Bill]) -> None:
         return
     for bill in expired:
         bill.enabled = False
-    db.add_all(expired_event(bill) for bill in expired)
+    db.add_all(disabled_event(bill) for bill in expired)
     await db.commit()
     # updated_at's onupdate=func.now() is server-computed - without a
     # refresh, the response would try to lazy-load it outside any awaited
@@ -105,12 +114,20 @@ async def export_bills(
     )
 
 
-@router.post("/import", response_model=list[BillRead], status_code=status.HTTP_201_CREATED)
-async def import_bills(
+def _describe_ambiguous_bill(parsed: BillCreate, matches: list[Bill]) -> str:
+    return (
+        f'"{parsed.name}" (${parsed.amount_cents / 100:.2f}, {parsed.recurrence_type.value}, '
+        f"starting {parsed.start_date}) matches {len(matches)} existing bills - resolve manually "
+        "before reimporting."
+    )
+
+
+@router.post("/import/preview", response_model=BillImportPreview)
+async def preview_bill_import(
     file: UploadFile,
     db: AsyncSession = Depends(get_db),
     account: BankAccount = Depends(get_owned_bank_account),
-) -> list[Bill]:
+) -> BillImportPreview:
     csv_text = (await file.read()).decode("utf-8-sig")  # -sig strips an Excel-added BOM
     parsed_bills, errors = parse_csv_rows(csv_text)
     if errors:
@@ -119,14 +136,81 @@ async def import_bills(
             detail={"errors": [{"row": e.row, "message": e.message} for e in errors]},
         )
 
-    bills = [Bill(account_id=account.id, **payload.model_dump()) for payload in parsed_bills]
-    db.add_all(bills)
+    result = await db.execute(select(Bill).where(Bill.account_id == account.id))
+    existing_bills = list(result.scalars().all())
+    reconciled = reconcile_bills(existing_bills, parsed_bills)
+
+    return BillImportPreview(
+        new=reconciled.new,
+        updated=[
+            BillImportUpdate(id=match.existing.id, fields=match.parsed) for match in reconciled.updated
+        ],
+        unchanged_count=len(reconciled.unchanged),
+        ambiguous=[
+            BillImportAmbiguous(message=_describe_ambiguous_bill(a.parsed, a.matches))
+            for a in reconciled.ambiguous
+        ],
+        omitted=[bill for bill in reconciled.omitted if bill.enabled],
+        errors=[],
+    )
+
+
+@router.post("/import/commit", response_model=BillImportCommitResponse)
+async def commit_bill_import(
+    payload: BillImportCommitRequest,
+    db: AsyncSession = Depends(get_db),
+    account: BankAccount = Depends(get_owned_bank_account),
+) -> BillImportCommitResponse:
+    for item in payload.new:
+        _validate_or_422(item.recurrence_type, item.recurrence_config)
+    for item in payload.updated:
+        _validate_or_422(item.fields.recurrence_type, item.fields.recurrence_config)
+
+    created_bills = [Bill(account_id=account.id, **item.model_dump()) for item in payload.new]
+    db.add_all(created_bills)
     await db.flush()  # assigns each bill.id, needed for the events' FK
-    db.add_all(created_event(bill) for bill in bills)
-    ids = [bill.id for bill in bills]
+    db.add_all(created_event(bill) for bill in created_bills)
+
+    updated_bills: list[Bill] = []
+    if payload.updated:
+        ids = [item.id for item in payload.updated]
+        result = await db.execute(
+            select(Bill).where(Bill.id.in_(ids), Bill.account_id == account.id)
+        )
+        bills_by_id = {bill.id: bill for bill in result.scalars().all()}
+        for item in payload.updated:
+            bill = bills_by_id.get(item.id)
+            if bill is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Bill {item.id} not found"
+                )
+            before = {field: getattr(bill, field) for field in [*TRACKED_BILL_FIELDS, "notes", "enabled"]}
+            update_data = item.fields.model_dump()
+            for field, value in update_data.items():
+                setattr(bill, field, value)
+            db.add_all(update_events(bill, update_data, before))
+            updated_bills.append(bill)
+
+    disabled_count = 0
+    if payload.omitted_ids:
+        result = await db.execute(
+            select(Bill).where(
+                Bill.id.in_(payload.omitted_ids), Bill.account_id == account.id, Bill.enabled.is_(True)
+            )
+        )
+        to_disable = list(result.scalars().all())
+        for bill in to_disable:
+            bill.enabled = False
+        db.add_all(disabled_event(bill) for bill in to_disable)
+        disabled_count = len(to_disable)
+
     await db.commit()
-    result = await db.execute(select(Bill).where(Bill.id.in_(ids)).order_by(Bill.id))
-    return list(result.scalars().all())
+    for bill in [*created_bills, *updated_bills]:
+        await db.refresh(bill)
+
+    return BillImportCommitResponse(
+        created=created_bills, updated=updated_bills, disabled_count=disabled_count
+    )
 
 
 @router.patch("/{bill_id}", response_model=BillRead)

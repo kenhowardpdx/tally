@@ -40,12 +40,13 @@ def created_event(bill: Bill) -> BillEvent:
     )
 
 
-def expired_event(bill: Bill) -> BillEvent:
-    """Bill auto-disabled because its end_date has passed (see
-    _auto_disable_expired in src/api/bills.py) - a plain DISABLED event, same
-    as a manual toggle, since there's no per-field diff to show and the
-    timeline already labels every DISABLED event the same way regardless of
-    cause.
+def disabled_event(bill: Bill) -> BillEvent:
+    """A plain DISABLED event with no per-field diff - used wherever a bill
+    is disabled other than through a user-initiated PATCH (which goes
+    through update_events instead): auto-disabled because its end_date has
+    passed (_auto_disable_expired in src/api/bills.py), or disabled because
+    a CSV reimport omitted it (src/api/bills.py's import/commit). The
+    timeline labels every DISABLED event the same way regardless of cause.
     """
     return BillEvent(account_id=bill.account_id, bill_id=bill.id, event_type=BillEventType.DISABLED)
 

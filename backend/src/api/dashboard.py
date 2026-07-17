@@ -82,6 +82,7 @@ async def _current_cycle_summary(db: AsyncSession, account: BankAccount, today: 
     windfalls_result = await db.execute(
         select(Windfall).where(
             Windfall.account_id == account.id,
+            Windfall.enabled.is_(True),
             Windfall.expected_date >= anchor,
             Windfall.expected_date <= cycle_end,
         )

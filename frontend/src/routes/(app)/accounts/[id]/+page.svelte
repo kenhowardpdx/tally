@@ -1,16 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { getAccount, listAccounts } from '$lib/api/accounts';
-	import {
-		createBill,
-		deleteBill,
-		exportBillsCsv,
-		importBillsCsv,
-		listBills,
-		updateBill,
-		type BillImportRowError
-	} from '$lib/api/bills';
-	import { ApiError } from '$lib/api';
+	import { createBill, deleteBill, listBills, updateBill } from '$lib/api/bills';
 	import type { BankAccount, Bill, RecurrenceType } from '$lib/api/types';
 	import { accountSuffix, todayIso } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
@@ -72,11 +63,6 @@
 	let moveTargetAccountId = $state('');
 	let moving = $state(false);
 	let showMoveModal = $state(false);
-
-	let exporting = $state(false);
-	let importing = $state(false);
-	let importErrors = $state<BillImportRowError[] | null>(null);
-	let fileInputEl = $state<HTMLInputElement | undefined>();
 
 	let editingBill = $state<Bill | null>(null);
 	let editName = $state('');
@@ -172,54 +158,6 @@
 		}
 	}
 
-	async function handleExport() {
-		exporting = true;
-		error = null;
-		try {
-			const blob = await exportBillsCsv(accountId);
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.href = url;
-			link.download = `bills-${accountId}.csv`;
-			link.click();
-			URL.revokeObjectURL(url);
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		} finally {
-			exporting = false;
-		}
-	}
-
-	function handleImportClick() {
-		fileInputEl?.click();
-	}
-
-	async function handleImportFile(event: Event) {
-		const file = (event.target as HTMLInputElement).files?.[0];
-		if (!file) return;
-		importing = true;
-		error = null;
-		importErrors = null;
-		try {
-			await importBillsCsv(accountId, file);
-			await loadBills();
-		} catch (err) {
-			if (err instanceof ApiError && err.body && typeof err.body === 'object' && 'detail' in err.body) {
-				const detail = (err.body as { detail?: { errors?: BillImportRowError[] } }).detail;
-				if (detail?.errors) {
-					importErrors = detail.errors;
-				} else {
-					error = 'Import failed.';
-				}
-			} else {
-				error = err instanceof Error ? err.message : String(err);
-			}
-		} finally {
-			importing = false;
-			if (fileInputEl) fileInputEl.value = '';
-		}
-	}
-
 	function openMoveModal(bill: Bill) {
 		movingBill = bill;
 		moveTargetAccountId = '';
@@ -289,46 +227,25 @@
 </script>
 
 <AccountNav {accountId} current="bills" />
-<div class="mt-2 flex items-center justify-between">
-	<h1 class="text-2xl font-semibold text-text">
-		Bills{accountSuffix(account)}
-	</h1>
-	<div class="flex gap-2">
-		<input
-			bind:this={fileInputEl}
-			type="file"
-			accept=".csv,text/csv"
-			class="hidden"
-			onchange={handleImportFile}
-		/>
-		<Button variant="secondary" onclick={handleImportClick} disabled={importing}>
-			{importing ? 'Importing…' : 'Import CSV'}
-		</Button>
-		<Button variant="secondary" onclick={handleExport} disabled={exporting}>
-			{exporting ? 'Exporting…' : 'Export CSV'}
-		</Button>
-	</div>
-</div>
+<h1 class="mt-2 text-2xl font-semibold text-text">
+	Bills{accountSuffix(account)}
+</h1>
 
 {#if error}
 	<p class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
 {/if}
 
-{#if importErrors}
-	<div class="mt-4 rounded-card bg-red-50 px-4 py-2 text-sm text-red-700">
-		<p class="font-medium">Import failed - fix these rows and try again:</p>
-		<ul class="mt-1 list-disc pl-5">
-			{#each importErrors as rowError (rowError.row)}
-				<li>Row {rowError.row}: {rowError.message}</li>
-			{/each}
-		</ul>
-	</div>
-{/if}
-
 <Card>
 	<form class="flex flex-wrap items-end gap-4" onsubmit={handleCreate}>
 		<Input label="Name" bind:value={name} placeholder="Rent" required />
-		<Input label="Amount ($)" type="number" bind:value={amount} placeholder="1500.00" required />
+		<Input
+			label="Amount ($)"
+			type="number"
+			step="0.01"
+			bind:value={amount}
+			placeholder="1500.00"
+			required
+		/>
 		<Select
 			label="Frequency"
 			bind:value={recurrenceType}
@@ -443,7 +360,7 @@
 	{#if editingBill}
 		<form class="flex flex-col gap-4" onsubmit={handleEditSubmit}>
 			<Input label="Name" bind:value={editName} required />
-			<Input label="Amount ($)" type="number" bind:value={editAmount} required />
+			<Input label="Amount ($)" type="number" step="0.01" bind:value={editAmount} required />
 			<Select
 				label="Frequency"
 				bind:value={editRecurrenceType}

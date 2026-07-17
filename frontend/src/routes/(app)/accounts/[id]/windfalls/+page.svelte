@@ -5,6 +5,7 @@
 	import type { BankAccount, Windfall } from '$lib/api/types';
 	import { accountSuffix } from '$lib/format';
 	import AccountNav from '$lib/components/AccountNav.svelte';
+	import Badge from '$lib/components/Badge.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import DatePicker from '$lib/components/DatePicker.svelte';
@@ -99,6 +100,15 @@
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			creating = false;
+		}
+	}
+
+	async function toggleEnabled(windfall: Windfall) {
+		try {
+			await updateWindfall(accountId, windfall.id, { enabled: !windfall.enabled });
+			await loadWindfalls();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -214,6 +224,7 @@
 					<th class="px-4 py-2 font-medium">Name</th>
 					<th class="px-4 py-2 text-right font-medium">Amount</th>
 					<th class="px-4 py-2"></th>
+					<th class="px-4 py-2"></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -223,6 +234,11 @@
 						<td class="px-4 py-2">{windfall.name}</td>
 						<td class="px-4 py-2 text-right text-emerald-700">
 							{formatAmount(windfall.amount_cents)}
+						</td>
+						<td class="px-4 py-2">
+							<button onclick={() => toggleEnabled(windfall)}>
+								<Badge enabled={windfall.enabled} />
+							</button>
 						</td>
 						<td class="px-4 py-2 text-right">
 							<RowActionsMenu

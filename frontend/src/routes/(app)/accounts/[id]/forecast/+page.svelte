@@ -10,6 +10,7 @@
 		ForecastCycle,
 		ForecastRequest,
 		ForecastResponse,
+		ForecastTransactionLine,
 		ForecastWindfallLine
 	} from '$lib/api/types';
 	import { accountSuffix } from '$lib/format';
@@ -286,6 +287,47 @@
 		});
 	}
 
+	type CycleItem =
+		| { type: 'bill'; date: string; key: string; bill: ForecastBillLine }
+		| { type: 'transaction'; date: string; key: string; transaction: ForecastTransactionLine }
+		| { type: 'windfall'; date: string; key: string; windfall: ForecastWindfallLine };
+
+	// Bills, transactions, and windfalls arrive from the backend as three
+	// separate per-type lists (each already sorted within itself) - merge them
+	// into one chronological feed here so a transaction dated early in the
+	// cycle shows up before a bill due later, rather than every transaction
+	// trailing every bill regardless of date.
+	function cycleItems(cycle: ForecastCycle): CycleItem[] {
+		const items: CycleItem[] = [
+			...cycle.bills.map(
+				(bill): CycleItem => ({
+					type: 'bill',
+					date: bill.due_date,
+					key: `bill-${bill.bill_id}-${bill.due_date}`,
+					bill
+				})
+			),
+			...cycle.transactions.map(
+				(transaction): CycleItem => ({
+					type: 'transaction',
+					date: transaction.date,
+					key: `transaction-${transaction.transaction_id}`,
+					transaction
+				})
+			),
+			...cycle.windfalls.map(
+				(windfall): CycleItem => ({
+					type: 'windfall',
+					date: windfall.expected_date,
+					key: `windfall-${windfall.windfall_id}`,
+					windfall
+				})
+			)
+		];
+		items.sort((a, b) => a.date.localeCompare(b.date));
+		return items;
+	}
+
 	// Forecasted total vs. sum-of-actuals (using override amounts where set,
 	// base amounts where not) for the active cycle - cycle.net_cents from the
 	// backend is already the "actual" side, since build_cycle substitutes
@@ -403,8 +445,10 @@
 						{/if}
 					</tr>
 					{#if expanded[cycle.start_date]}
-						{#each cycle.bills as bill (`bill-${bill.bill_id}-${bill.due_date}`)}
-							{#if active}
+						{#each cycleItems(cycle) as item (item.key)}
+							{#if item.type === 'bill'}
+								{@const bill = item.bill}
+								{#if active}
 								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
 									<td class="px-4 py-2 pl-8" colspan="3">
 										<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -466,22 +510,22 @@
 									</td>
 								</tr>
 							{/if}
-						{/each}
-						{#each cycle.transactions as transaction (`transaction-${transaction.transaction_id}`)}
-							<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
-								<td class="px-4 py-2 pl-8">{transaction.date}</td>
-								<td class="px-4 py-2">{transaction.description ?? 'Transaction'}</td>
-								<td
-									class="px-4 py-2 text-right {transaction.amount_cents < 0
-										? 'text-red-700'
-										: 'text-emerald-700'}"
-								>
-									{formatAmount(transaction.amount_cents)}
-								</td>
-							</tr>
-						{/each}
-						{#each cycle.windfalls as windfall (`windfall-${windfall.windfall_id}`)}
-							{#if active}
+							{:else if item.type === 'transaction'}
+								{@const transaction = item.transaction}
+								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
+									<td class="px-4 py-2 pl-8">{transaction.date}</td>
+									<td class="px-4 py-2">{transaction.description ?? 'Transaction'}</td>
+									<td
+										class="px-4 py-2 text-right {transaction.amount_cents < 0
+											? 'text-red-700'
+											: 'text-emerald-700'}"
+									>
+										{formatAmount(transaction.amount_cents)}
+									</td>
+								</tr>
+							{:else}
+								{@const windfall = item.windfall}
+								{#if active}
 								<tr class="border-b border-slate-100 text-sm text-slate-600 last:border-0">
 									<td class="px-4 py-2 pl-8" colspan="3">
 										<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -554,6 +598,7 @@
 										{/if}
 									</td>
 								</tr>
+							{/if}
 							{/if}
 						{/each}
 						{#if active}

@@ -224,6 +224,10 @@
 	function formatAmount(cents: number): string {
 		return (cents / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 	}
+
+	function dateRangeLabel(bill: Bill): string {
+		return bill.end_date ? `${bill.start_date} - ${bill.end_date}` : `${bill.start_date} - Ongoing`;
+	}
 </script>
 
 <AccountNav {accountId} current="bills" />
@@ -273,6 +277,7 @@
 					<th class="px-4 py-2 font-medium">Name</th>
 					<th class="px-4 py-2 font-medium">Amount</th>
 					<th class="px-4 py-2 font-medium">Frequency</th>
+					<th class="px-4 py-2 font-medium">Date range</th>
 					<th class="px-4 py-2 font-medium">Status</th>
 					<th class="px-4 py-2"></th>
 				</tr>
@@ -303,6 +308,7 @@
 						</td>
 						<td class="px-4 py-2">{formatAmount(bill.amount_cents)}</td>
 						<td class="px-4 py-2 text-slate-600">{recurrenceLabels[bill.recurrence_type]}</td>
+						<td class="px-4 py-2 whitespace-nowrap text-slate-600">{dateRangeLabel(bill)}</td>
 						<td class="px-4 py-2">
 							<button onclick={() => toggleEnabled(bill)}>
 								<Badge enabled={bill.enabled} />

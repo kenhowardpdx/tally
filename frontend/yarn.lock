@@ -47,10 +47,10 @@
     jose "^6.0.8"
     openid-client "^6.8.0"
 
-"@auth0/auth0-spa-js@^2.23.0":
-  version "2.23.0"
-  resolved "https://registry.npmjs.org/@auth0/auth0-spa-js/-/auth0-spa-js-2.23.0.tgz"
-  integrity sha512-fRiPlTIMLahes6eXq5C4CF8zFi9vLxUtii8e7CESmzWBJGSa3jRrnjgQVAPSaox2x+CwzTFcJbt4mR+UiVMk1Q==
+"@auth0/auth0-spa-js@^2.24.0":
+  version "2.24.0"
+  resolved "https://registry.yarnpkg.com/@auth0/auth0-spa-js/-/auth0-spa-js-2.24.0.tgz#92b0ba72e7d693a530e7af30b515f7aae0bbe541"
+  integrity sha512-9Z/1OpHqak0Aquh5HcCMVJOXKM9EXz1PyuDsD1hCt7oWXcrHPFB330joplkKWpNNT5pRpddeQ+teR5+L6n4J6g==
   dependencies:
     "@auth0/auth0-auth-js" "^1.10.0"
     browser-tabs-lock "^1.3.0"

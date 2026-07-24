@@ -38,6 +38,6 @@
 	"dependencies": {
 		"@auth0/auth0-spa-js": "^2.24.0",
 		"d3-shape": "^3.2.0",
-		"layerchart": "^2.0.1"
+		"layerchart": "^2.0.2"
 	}
 }

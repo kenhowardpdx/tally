@@ -20,7 +20,7 @@ python-multipart = "^0.0.32"
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
 pytest-asyncio = "^1.4.0"
-ruff = "^0.15.21"
+ruff = "^0.15.22"
 
 # Needed to run the Docker Compose / container deployment path, not the Lambda
 # handler (Mangum wraps the app directly there) - kept out of the main group so
